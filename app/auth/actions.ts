@@ -11,7 +11,7 @@ import {
 } from "@/lib/auth";
 import { validatePassword, generateTemporaryPassword } from "@/lib/password-rules";
 
-export type UserRole = "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN";
+export type UserRole = "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN" | string;
 
 export type AuthActionResult<T = unknown> = {
   success: boolean;
@@ -20,10 +20,18 @@ export type AuthActionResult<T = unknown> = {
   isFirstAdmin?: boolean;
 };
 
+export interface AvailableRoleOption {
+  id: string;
+  name: string;
+  isSystem: boolean;
+}
+
 export interface TeamMember {
   id: string;
   username: string;
-  role: UserRole;
+  role: string;
+  roleId?: string | null;
+  roleName?: string;
   createdAt: string;
 }
 
@@ -218,6 +226,7 @@ export async function getSystemAuthStatus() {
 export async function getTeamMembersAction(): Promise<
   AuthActionResult<{
     members: TeamMember[];
+    availableRoles: AvailableRoleOption[];
     currentUserRole: UserRole;
     isSuperAdmin: boolean;
     isMasterAdmin: boolean;
@@ -236,6 +245,13 @@ export async function getTeamMembersAction(): Promise<
         id: true,
         username: true,
         role: true,
+        roleId: true,
+        roleRef: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         createdAt: true,
       },
     });
@@ -249,6 +265,11 @@ export async function getTeamMembersAction(): Promise<
       users[0].role = "SUPER_ADMIN";
     }
 
+    const availableRoles = await prisma.role.findMany({
+      select: { id: true, name: true, isSystem: true },
+      orderBy: [{ isSystem: "desc" }, { name: "asc" }],
+    });
+
     const currentUser = users.find((u) => u.id === session.userId);
     const currentUserRole = (currentUser?.role || session.role || "ADMIN") as UserRole;
     const isSuperAdmin = currentUserRole === "SUPER_ADMIN";
@@ -260,9 +281,12 @@ export async function getTeamMembersAction(): Promise<
         members: users.map((u) => ({
           id: u.id,
           username: u.username,
-          role: u.role as UserRole,
+          role: u.role,
+          roleId: u.roleId,
+          roleName: u.roleRef?.name || u.role,
           createdAt: u.createdAt.toISOString(),
         })),
+        availableRoles,
         currentUserRole,
         isSuperAdmin,
         isMasterAdmin,
@@ -414,27 +438,69 @@ export async function deleteTeamMemberAction(
 }
 
 /**
- * Change User Role (SUPER_ADMIN only)
+ * Change User Role (SUPER_ADMIN and MASTER_ADMIN)
  */
 export async function updateUserRoleAction(
   targetUserId: string,
-  newRole: UserRole
+  newRoleOrId: string
 ): Promise<AuthActionResult> {
   try {
     const session = await getSession();
     if (!session) return { success: false, error: "Unauthorized." };
 
     const caller = await prisma.user.findUnique({ where: { id: session.userId } });
-    if (!caller || caller.role !== "SUPER_ADMIN") {
+    if (!caller || (caller.role !== "SUPER_ADMIN" && caller.role !== "MASTER_ADMIN")) {
       return {
         success: false,
-        error: "Permission denied: Only Super Admin can change user roles.",
+        error: "Permission denied: Only Super Admin and Master Admin can change roles.",
       };
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) {
+      return { success: false, error: "User not found." };
+    }
+
+    // Master Admin cannot modify Super Admin or promote to Super Admin/Master Admin
+    if (caller.role === "MASTER_ADMIN") {
+      if (targetUser.role === "SUPER_ADMIN" || targetUser.role === "MASTER_ADMIN") {
+        return {
+          success: false,
+          error: "Permission denied: Master Admin cannot modify administrative accounts.",
+        };
+      }
+      if (newRoleOrId === "SUPER_ADMIN" || newRoleOrId === "MASTER_ADMIN") {
+        return {
+          success: false,
+          error: "Permission denied: Master Admin cannot grant admin privileges.",
+        };
+      }
+    }
+
+    // Lookup matching Role in DB
+    const matchingRole = await prisma.role.findFirst({
+      where: {
+        OR: [
+          { id: newRoleOrId },
+          { name: { equals: newRoleOrId, mode: "insensitive" } },
+        ],
+      },
+    });
+
+    let assignedRoleName = newRoleOrId;
+    let assignedRoleId: string | null = null;
+
+    if (matchingRole) {
+      assignedRoleName = matchingRole.name;
+      assignedRoleId = matchingRole.id;
     }
 
     await prisma.user.update({
       where: { id: targetUserId },
-      data: { role: newRole },
+      data: {
+        role: assignedRoleName,
+        roleId: assignedRoleId,
+      },
     });
 
     return { success: true };

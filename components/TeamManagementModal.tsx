@@ -25,6 +25,7 @@ import {
   updateUserRoleAction,
   generateRandomPasswordAction,
   TeamMember,
+  AvailableRoleOption,
   UserRole,
 } from "@/app/auth/actions";
 import { validatePassword } from "@/lib/password-rules";
@@ -39,6 +40,7 @@ export default function TeamManagementModal({
   onClose,
 }: TeamManagementModalProps) {
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<AvailableRoleOption[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isMasterAdmin, setIsMasterAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export default function TeamManagementModal({
     const res = await getTeamMembersAction();
     if (res.success && res.data) {
       setMembers(res.data.members);
+      setAvailableRoles(res.data.availableRoles || []);
       setIsSuperAdmin(res.data.isSuperAdmin);
       setIsMasterAdmin(res.data.isMasterAdmin);
       setCurrentUserId(res.data.currentUserId);
@@ -443,7 +446,7 @@ export default function TeamManagementModal({
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${roleConfig.pillBg}`}
                           >
                             <RoleIcon className="w-3 h-3" />
-                            <span>{roleConfig.label}</span>
+                            <span>{member.roleName || roleConfig.label}</span>
                           </span>
                         </div>
                       </div>
@@ -451,20 +454,36 @@ export default function TeamManagementModal({
 
                     {/* Actions Area */}
                     <div className="flex items-center gap-2 self-end sm:self-center">
-                      {/* Role Selector for Super Admin */}
+                      {/* Dynamic Role Selector for Super Admin and Master Admin */}
                       {canChangeRole && (
                         <select
                           value={member.role}
                           onChange={(e) =>
-                            handleUpdateRole(member, e.target.value as UserRole)
+                            handleUpdateRole(member, e.target.value)
                           }
                           disabled={roleChangingId === member.id}
                           className="text-[11px] font-semibold py-1 px-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                           title="Change user role"
                         >
-                          <option value="SUPER_ADMIN">🛡️ Developer (Super)</option>
-                          <option value="MASTER_ADMIN">👑 Florist Owner (Master)</option>
-                          <option value="ADMIN">🌿 Florist Staff</option>
+                          {availableRoles.length > 0 ? (
+                            availableRoles
+                              .filter((r) => isSuperAdmin || !r.isSystem)
+                              .map((r) => (
+                                <option key={r.id} value={r.name}>
+                                  {r.name === "SUPER_ADMIN"
+                                    ? "🛡️ Developer (Super)"
+                                    : r.name === "MASTER_ADMIN"
+                                    ? "👑 Florist Owner (Master)"
+                                    : `🌿 ${r.name}`}
+                                </option>
+                              ))
+                          ) : (
+                            <>
+                              <option value="SUPER_ADMIN">🛡️ Developer (Super)</option>
+                              <option value="MASTER_ADMIN">👑 Florist Owner (Master)</option>
+                              <option value="ADMIN">🌿 Florist Staff</option>
+                            </>
+                          )}
                         </select>
                       )}
 

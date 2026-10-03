@@ -18,9 +18,11 @@ import {
   Users,
   ShieldAlert,
   Crown,
+  Shield,
 } from "lucide-react";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
 import TeamManagementModal from "./TeamManagementModal";
+import RoleManagementModal from "./RoleManagementModal";
 import {
   toggleProductAvailability,
   deleteProduct,
@@ -29,18 +31,41 @@ import {
 import { logoutAction } from "@/app/auth/actions";
 import { formatPrice } from "@/lib/utils";
 
+export interface UserPermissions {
+  canView: boolean;
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canManageTeam: boolean;
+  canManageRoles: boolean;
+  roleName: string;
+}
+
 interface AdminProductListProps {
   initialProducts: SerializedProduct[];
   currentUser?: {
     username: string;
-    role: "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN";
+    role: string;
+    roleName?: string;
   } | null;
+  permissions?: UserPermissions;
 }
 
 export default function AdminProductList({
   initialProducts,
   currentUser,
+  permissions,
 }: AdminProductListProps) {
+  const perms: UserPermissions = permissions || {
+    canView: true,
+    canAdd: currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "MASTER_ADMIN",
+    canEdit: true,
+    canDelete: currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "MASTER_ADMIN",
+    canManageTeam: currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "MASTER_ADMIN",
+    canManageRoles: currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "MASTER_ADMIN",
+    roleName: currentUser?.role || "Staff",
+  };
+
   const [products, setProducts] = useState<SerializedProduct[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -49,6 +74,7 @@ export default function AdminProductList({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SerializedProduct | null>(null);
   const [teamModalOpen, setTeamModalOpen] = useState(false);
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [seedingLoading, setSeedingLoading] = useState(false);
@@ -153,44 +179,56 @@ export default function AdminProductList({
                 <h1 className="text-base font-bold tracking-tight text-slate-900 leading-tight">
                   Flora Studio
                 </h1>
-                {currentUser?.role === "SUPER_ADMIN" && (
+                {currentUser?.role === "SUPER_ADMIN" ? (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-0.5">
                     <ShieldAlert className="w-2.5 h-2.5" />
                     <span>Dev</span>
                   </span>
-                )}
-                {currentUser?.role === "MASTER_ADMIN" && (
+                ) : currentUser?.role === "MASTER_ADMIN" ? (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
                     <Crown className="w-2.5 h-2.5" />
                     <span>Owner</span>
                   </span>
-                )}
-                {currentUser?.role === "ADMIN" && (
+                ) : (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                    Staff
+                    {currentUser?.roleName || "Staff"}
                   </span>
                 )}
               </div>
               <p className="text-[11px] font-medium text-emerald-700 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {currentUser?.username
-                  ? `@${currentUser.username} • Catalog Manager`
+                  ? `@${currentUser.username} • ${perms.roleName || "Florist Staff"}`
                   : "Mobile Catalog Manager"}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setTeamModalOpen(true)}
-              className="p-2 rounded-full text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-              title="Team & Access Control"
-            >
-              <Users className="w-4 h-4" />
-            </button>
+            {/* Role & Permission Modules (Super Admin & Master Admin only) */}
+            {perms.canManageRoles && (
+              <button
+                onClick={() => setRoleModalOpen(true)}
+                className="p-2 rounded-full text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
+                title="Role & Permission Modules"
+              >
+                <Shield className="w-4 h-4 text-indigo-600" />
+              </button>
+            )}
 
-            {/* Only Super Admin and Master Admin can register accounts */}
-            {(currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "MASTER_ADMIN") && (
+            {/* Team & Password Management */}
+            {perms.canManageTeam && (
+              <button
+                onClick={() => setTeamModalOpen(true)}
+                className="p-2 rounded-full text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                title="Team & Access Control"
+              >
+                <Users className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Register New Account */}
+            {perms.canManageTeam && (
               <Link
                 href="/register"
                 className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
@@ -214,16 +252,19 @@ export default function AdminProductList({
               <LogOut className="w-4 h-4" />
             </button>
 
-            <button
-              onClick={() => {
-                setEditingProduct(null);
-                setModalOpen(true);
-              }}
-              className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-emerald-600/20 active:scale-95 ml-1"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Item</span>
-            </button>
+            {/* Top Bar New Item Button (Rendered only if role has canAdd permission) */}
+            {perms.canAdd && (
+              <button
+                onClick={() => {
+                  setEditingProduct(null);
+                  setModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-emerald-600/20 active:scale-95 ml-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Item</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -390,15 +431,20 @@ export default function AdminProductList({
 
                 {/* Actions & iOS Switch */}
                 <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                  {/* Stock Toggle Switch */}
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  {/* Stock Toggle Switch (active only if canEdit) */}
+                  <label
+                    className={`flex items-center gap-1.5 select-none ${
+                      perms.canEdit ? "cursor-pointer" : "cursor-not-allowed opacity-75"
+                    }`}
+                  >
                     <span className="text-[11px] font-medium text-slate-500 hidden sm:inline">
                       {product.isAvailable ? "In Stock" : "Out"}
                     </span>
                     <input
                       type="checkbox"
                       checked={product.isAvailable}
-                      onChange={() => handleToggleStock(product)}
+                      disabled={!perms.canEdit}
+                      onChange={() => perms.canEdit && handleToggleStock(product)}
                       className="sr-only"
                     />
                     <div
@@ -414,27 +460,35 @@ export default function AdminProductList({
                     </div>
                   </label>
 
-                  {/* Edit & Delete Icons */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setEditingProduct(product);
-                        setModalOpen(true);
-                      }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                      title="Edit flower details"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(product.id, product.name)}
-                      disabled={deletingId === product.id}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                      title="Delete flower"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {/* Edit & Delete Icons (Strictly conditional based on role permissions) */}
+                  {(perms.canEdit || perms.canDelete) && (
+                    <div className="flex items-center gap-1">
+                      {perms.canEdit && (
+                        <button
+                          onClick={() => {
+                            setEditingProduct(product);
+                            setModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          title="Edit flower details"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {/* If role does not have delete permission (e.g. Staff), Delete button is NOT rendered */}
+                      {perms.canDelete && (
+                        <button
+                          onClick={() => handleDelete(product.id, product.name)}
+                          disabled={deletingId === product.id}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Delete flower"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -442,21 +496,23 @@ export default function AdminProductList({
         )}
       </main>
 
-      {/* iOS Fixed Bottom Navigation / Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 p-4 ios-glass border-t border-slate-200/80">
-        <div className="max-w-xl mx-auto">
-          <button
-            onClick={() => {
-              setEditingProduct(null);
-              setModalOpen(true);
-            }}
-            className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
-          >
-            <Plus className="w-5 h-5 stroke-[2.5]" />
-            <span>Add New Flower</span>
-          </button>
+      {/* iOS Fixed Bottom Navigation / Action Bar (Shown only if role has canAdd permission) */}
+      {perms.canAdd && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 ios-glass border-t border-slate-200/80">
+          <div className="max-w-xl mx-auto">
+            <button
+              onClick={() => {
+                setEditingProduct(null);
+                setModalOpen(true);
+              }}
+              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus className="w-5 h-5 stroke-[2.5]" />
+              <span>Add New Flower</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add / Edit Product Modal */}
       <ProductFormModal
@@ -476,6 +532,16 @@ export default function AdminProductList({
         isOpen={teamModalOpen}
         onClose={() => setTeamModalOpen(false)}
       />
+
+      {/* Role & Permission Modules Modal */}
+      {perms.canManageRoles && (
+        <RoleManagementModal
+          isOpen={roleModalOpen}
+          onClose={() => setRoleModalOpen(false)}
+          currentUserRole={currentUser?.role}
+          onRoleChanged={() => window.location.reload()}
+        />
+      )}
     </div>
   );
 }

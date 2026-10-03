@@ -16,8 +16,26 @@ model User {
   username  String   @unique
   password  String
   role      String   @default("ADMIN")
+  roleId    String?
+  roleRef   Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([roleId])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  canView     Boolean  @default(true)
+  canAdd      Boolean  @default(false)
+  canEdit     Boolean  @default(false)
+  canDelete   Boolean  @default(false)
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Product {

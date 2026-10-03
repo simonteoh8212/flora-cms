@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import AdminProductList from "@/components/AdminProductList";
 import { SerializedProduct } from "@/components/ProductFormModal";
 import { getSession } from "@/lib/auth";
+import { getCurrentUserPermissions } from "@/app/roles/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -84,10 +85,13 @@ export default async function AdminPage() {
   let isDemoFallback = false;
 
   const session = await getSession();
+  const permissions = await getCurrentUserPermissions();
+
   const currentUser = session
     ? {
         username: session.username,
-        role: session.role as "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN",
+        role: session.role,
+        roleName: permissions.roleName,
       }
     : null;
 
@@ -125,7 +129,11 @@ export default async function AdminPage() {
           <span>✨ <strong>Demo Mode:</strong> Displaying sample florist items. Connect Vercel Postgres to save live changes permanently.</span>
         </div>
       )}
-      <AdminProductList initialProducts={products} currentUser={currentUser} />
+      <AdminProductList
+        initialProducts={products}
+        currentUser={currentUser}
+        permissions={permissions}
+      />
     </div>
   );
 }

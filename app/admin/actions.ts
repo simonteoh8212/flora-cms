@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { Prisma } from "@prisma/client";
+import { getSession } from "@/lib/auth";
+import { getCurrentUserPermissions } from "@/app/roles/actions";
 
 export type ActionResult<T = unknown> = {
   success: boolean;
@@ -16,6 +18,14 @@ export type ActionResult<T = unknown> = {
  */
 export async function createProduct(formData: FormData): Promise<ActionResult> {
   try {
+    const perms = await getCurrentUserPermissions();
+    if (!perms.canAdd) {
+      return {
+        success: false,
+        error: "Permission denied: Your role does not have permission to add new products.",
+      };
+    }
+
     const name = formData.get("name")?.toString().trim();
     const description = formData.get("description")?.toString().trim() || null;
     const priceStr = formData.get("price")?.toString().trim();
@@ -85,6 +95,14 @@ export async function updateProduct(
   formData: FormData
 ): Promise<ActionResult> {
   try {
+    const perms = await getCurrentUserPermissions();
+    if (!perms.canEdit) {
+      return {
+        success: false,
+        error: "Permission denied: Your role does not have permission to edit products.",
+      };
+    }
+
     const name = formData.get("name")?.toString().trim();
     const description = formData.get("description")?.toString().trim() || null;
     const priceStr = formData.get("price")?.toString().trim();
@@ -150,6 +168,14 @@ export async function toggleProductAvailability(
   isAvailable: boolean
 ): Promise<ActionResult> {
   try {
+    const perms = await getCurrentUserPermissions();
+    if (!perms.canEdit) {
+      return {
+        success: false,
+        error: "Permission denied: Your role does not have permission to change stock availability.",
+      };
+    }
+
     const product = await prisma.product.update({
       where: { id },
       data: { isAvailable },
@@ -176,6 +202,14 @@ export async function toggleProductAvailability(
  */
 export async function deleteProduct(id: string): Promise<ActionResult> {
   try {
+    const perms = await getCurrentUserPermissions();
+    if (!perms.canDelete) {
+      return {
+        success: false,
+        error: "Permission denied: Your role does not have permission to delete products.",
+      };
+    }
+
     await prisma.product.delete({
       where: { id },
     });
@@ -195,6 +229,14 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
  */
 export async function seedDemoProducts(): Promise<ActionResult> {
   try {
+    const session = await getSession();
+    if (session?.role !== "SUPER_ADMIN" && session?.role !== "MASTER_ADMIN") {
+      return {
+        success: false,
+        error: "Permission denied: Only Super Admin and Master Admin can seed demo products.",
+      };
+    }
+
     const count = await prisma.product.count();
     if (count > 0) {
       return { success: false, error: "Catalog already has products." };
