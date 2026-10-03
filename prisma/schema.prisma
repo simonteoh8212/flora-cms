@@ -1,0 +1,26 @@
+// Prisma schema for Flora CMS
+// Designed for Vercel Postgres deployment
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String
+  isAvailable Boolean  @default(true)
+  category    String   @default("Bouquet")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isAvailable])
+}
