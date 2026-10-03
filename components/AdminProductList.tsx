@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -20,6 +20,8 @@ import {
   Crown,
   Shield,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
@@ -113,6 +115,45 @@ export default function AdminProductList({
 
   const inStockCount = products.filter((p) => p.isAvailable).length;
   const outOfStockCount = products.filter((p) => !p.isAvailable).length;
+
+  // Pagination State (10 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, stockFilter]);
+
+  const totalItems = filteredProducts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    const target = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(target);
+    window.scrollTo({ top: 100, behavior: "smooth" });
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (safeCurrentPage <= 3) {
+        pages.push(1, 2, 3, "...", totalPages);
+      } else if (safeCurrentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", safeCurrentPage, "...", totalPages);
+      }
+    }
+    return pages;
+  };
 
   // Handle instant optimistic toggle for availability
   const handleToggleStock = async (product: SerializedProduct) => {
@@ -405,7 +446,7 @@ export default function AdminProductList({
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <div
                 key={product.id}
                 className={`bg-white rounded-2xl p-3 border transition-all shadow-ios flex items-center gap-3.5 ${
@@ -520,6 +561,74 @@ export default function AdminProductList({
                 </div>
               </div>
             ))}
+
+            {/* Numbered Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="pt-5 pb-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200/80">
+                {/* Items Counter Summary */}
+                <p className="text-xs text-slate-500 font-medium order-2 sm:order-1">
+                  Showing <span className="font-semibold text-slate-800">{startIndex + 1}–{endIndex}</span> of{" "}
+                  <span className="font-semibold text-slate-800">{totalItems}</span> items
+                </p>
+
+                {/* Numbered Page Buttons */}
+                <div className="flex items-center gap-1.5 order-1 sm:order-2">
+                  {/* Previous Page Button */}
+                  <button
+                    onClick={() => handlePageChange(safeCurrentPage - 1)}
+                    disabled={safeCurrentPage === 1}
+                    className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs active:scale-95"
+                    title="Previous Page"
+                    aria-label="Previous Page"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  {/* Page Number Pills */}
+                  {getPageNumbers().map((page, idx) => {
+                    if (page === "...") {
+                      return (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-2 py-1 text-slate-400 text-xs font-semibold select-none"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+
+                    const pageNum = page as number;
+                    const isActive = pageNum === safeCurrentPage;
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`min-w-[34px] h-[34px] px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center select-none active:scale-95 ${
+                          isActive
+                            ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs"
+                        }`}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  {/* Next Page Button */}
+                  <button
+                    onClick={() => handlePageChange(safeCurrentPage + 1)}
+                    disabled={safeCurrentPage === totalPages}
+                    className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs active:scale-95"
+                    title="Next Page"
+                    aria-label="Next Page"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
