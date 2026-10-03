@@ -182,110 +182,114 @@ export default function AdminProductList({
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-28">
       {/* iOS Top App Header */}
       <header className="sticky top-0 z-30 ios-glass border-b border-slate-200/80 transition-all">
-        <div className="max-w-xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/30">
+        <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/30 flex-shrink-0">
               <Package className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-base font-bold tracking-tight text-slate-900 leading-tight">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-nowrap">
+                <h1 className="text-base font-bold tracking-tight text-slate-900 leading-tight whitespace-nowrap">
                   Flora Studio
                 </h1>
                 {currentUser?.role === "SUPER_ADMIN" ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-0.5">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-0.5 flex-shrink-0">
                     <ShieldAlert className="w-2.5 h-2.5" />
                     <span>Dev</span>
                   </span>
                 ) : currentUser?.role === "MASTER_ADMIN" ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5 flex-shrink-0">
                     <Crown className="w-2.5 h-2.5" />
                     <span>Owner</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex-shrink-0">
                     {currentUser?.roleName || "Staff"}
                   </span>
                 )}
               </div>
-              <p className="text-[11px] font-medium text-emerald-700 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {currentUser?.username
-                  ? `@${currentUser.username} • ${perms.roleName || "Florist Staff"}`
-                  : "Mobile Catalog Manager"}
+              <p className="text-[11px] font-medium text-emerald-700 flex items-center gap-1 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                <span className="truncate">{currentUser?.username ? `@${currentUser.username}` : "Online"}</span>
+                <span className="text-slate-300 hidden sm:inline">•</span>
+                <span className="text-slate-500 hidden sm:inline truncate">{perms.roleName || "Florist Staff"}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {/* Role & Permission Modules (Super Admin & Master Admin only) */}
-            {perms.canManageRoles && (
-              <button
-                onClick={() => setRoleModalOpen(true)}
-                className="p-2 rounded-full text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
-                title="Role & Permission Modules"
-              >
-                <Shield className="w-4 h-4 text-indigo-600" />
-              </button>
-            )}
-
-            {/* Team & Password Management */}
-            {perms.canManageTeam && (
-              <button
-                onClick={() => setTeamModalOpen(true)}
-                className="p-2 rounded-full text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-                title="Team & Access Control"
-              >
-                <Users className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Register New Account */}
-            {perms.canManageTeam && (
-              <Link
-                href="/register"
-                onClick={() => setNavigatingRegister(true)}
-                className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors relative"
-                title={
-                  currentUser?.role === "SUPER_ADMIN"
-                    ? "Create Florist Owner or Staff"
-                    : "Register Florist Staff"
-                }
-              >
-                {navigatingRegister ? (
-                  <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
-                ) : (
-                  <UserPlus className="w-4 h-4" />
-                )}
-              </Link>
-            )}
-
-            <button
-              onClick={async () => {
-                setIsLoggingOut(true);
-                await logoutAction();
-              }}
-              disabled={isLoggingOut}
-              className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-              title="Log out"
-            >
-              {isLoggingOut ? (
-                <Loader2 className="w-4 h-4 text-rose-500 animate-spin" />
-              ) : (
-                <LogOut className="w-4 h-4" />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* iOS Grouped Toolbar for Admin Controls */}
+            <div className="flex items-center bg-slate-100/90 p-0.5 sm:p-1 rounded-2xl border border-slate-200/70 shadow-2xs">
+              {/* Role & Permission Modules (Super Admin & Master Admin only) */}
+              {perms.canManageRoles && (
+                <button
+                  onClick={() => setRoleModalOpen(true)}
+                  className="p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-indigo-700 hover:bg-white active:scale-95 transition-all"
+                  title="Role & Permission Modules"
+                >
+                  <Shield className="w-4 h-4 text-indigo-600" />
+                </button>
               )}
-            </button>
 
-            {/* Top Bar New Item Button (Rendered only if role has canAdd permission) */}
+              {/* Team & Password Management */}
+              {perms.canManageTeam && (
+                <button
+                  onClick={() => setTeamModalOpen(true)}
+                  className="p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-white active:scale-95 transition-all"
+                  title="Team & Access Control"
+                >
+                  <Users className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Register New Account */}
+              {perms.canManageTeam && (
+                <Link
+                  href="/register"
+                  onClick={() => setNavigatingRegister(true)}
+                  className="p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-white active:scale-95 transition-all relative"
+                  title={
+                    currentUser?.role === "SUPER_ADMIN"
+                      ? "Create Florist Owner or Staff"
+                      : "Register Florist Staff"
+                  }
+                >
+                  {navigatingRegister ? (
+                    <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
+                  ) : (
+                    <UserPlus className="w-4 h-4" />
+                  )}
+                </Link>
+              )}
+
+              {/* Logout Button */}
+              <button
+                onClick={async () => {
+                  setIsLoggingOut(true);
+                  await logoutAction();
+                }}
+                disabled={isLoggingOut}
+                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-white active:scale-95 transition-all"
+                title="Log out"
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="w-4 h-4 text-rose-500 animate-spin" />
+                ) : (
+                  <LogOut className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+
+            {/* Desktop "New Item" button (Hidden on mobile because mobile uses the fixed bottom action bar) */}
             {perms.canAdd && (
               <button
                 onClick={() => {
                   setEditingProduct(null);
                   setModalOpen(true);
                 }}
-                className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-emerald-600/20 active:scale-95 ml-1"
+                className="hidden sm:flex px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold items-center gap-1.5 transition-all shadow-sm shadow-emerald-600/20 active:scale-95"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
                 <span>New Item</span>
               </button>
             )}
