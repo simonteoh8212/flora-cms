@@ -82,6 +82,9 @@ const DEMO_FALLBACK_PRODUCTS: SerializedProduct[] = [
 
 export default async function AdminPage() {
   let products: SerializedProduct[] = [];
+  let totalCount = 0;
+  let inStockCount = 0;
+  let outOfStockCount = 0;
   let isDemoFallback = false;
 
   const session = await getSession();
@@ -96,9 +99,19 @@ export default async function AdminPage() {
     : null;
 
   try {
-    const rawProducts = await prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const [rawProducts, dbTotalCount, dbInStockCount, dbOutOfStockCount] = await Promise.all([
+      prisma.product.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 3, // Initial first page of items matching ITEMS_PER_PAGE
+      }),
+      prisma.product.count(),
+      prisma.product.count({ where: { isAvailable: true } }),
+      prisma.product.count({ where: { isAvailable: false } }),
+    ]);
+
+    totalCount = dbTotalCount;
+    inStockCount = dbInStockCount;
+    outOfStockCount = dbOutOfStockCount;
 
     if (rawProducts && rawProducts.length > 0) {
       products = rawProducts.map((p) => ({
@@ -118,7 +131,10 @@ export default async function AdminPage() {
   } catch (error: unknown) {
     console.warn("Database connection notice:", error);
     // Provide sample bouquets so the admin UI is instantly testable on mobile even before database provisioning
-    products = DEMO_FALLBACK_PRODUCTS;
+    products = DEMO_FALLBACK_PRODUCTS.slice(0, 3);
+    totalCount = DEMO_FALLBACK_PRODUCTS.length;
+    inStockCount = DEMO_FALLBACK_PRODUCTS.filter((p) => p.isAvailable).length;
+    outOfStockCount = DEMO_FALLBACK_PRODUCTS.filter((p) => !p.isAvailable).length;
     isDemoFallback = true;
   }
 
@@ -131,6 +147,9 @@ export default async function AdminPage() {
       )}
       <AdminProductList
         initialProducts={products}
+        initialTotalCount={totalCount}
+        initialInStockCount={inStockCount}
+        initialOutOfStockCount={outOfStockCount}
         currentUser={currentUser}
         permissions={permissions}
       />

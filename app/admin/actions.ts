@@ -306,3 +306,109 @@ export async function seedDemoProducts(): Promise<ActionResult> {
     return { success: false, error: message };
   }
 }
+
+export interface PaginatedProductItem {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string;
+  imageUrl: string;
+  isAvailable: boolean;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetProductsParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  category?: string;
+  stock?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK";
+}
+
+export interface PaginatedProductsResult {
+  products: PaginatedProductItem[];
+  totalCount: number;
+  inStockCount: number;
+  outOfStockCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/**
+ * Fetches products page by page from the database with Prisma skip & take
+ */
+export async function getPaginatedProductsAction(
+  params: GetProductsParams
+): Promise<ActionResult<PaginatedProductsResult>> {
+  try {
+    const page = Math.max(1, params.page || 1);
+    const pageSize = Math.max(1, params.pageSize || 10);
+    const search = params.search?.trim() || "";
+    const category = params.category || "All";
+    const stock = params.stock || "ALL";
+
+    const where: Prisma.ProductWhereInput = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    if (category && category !== "All") {
+      where.category = { equals: category, mode: "insensitive" };
+    }
+
+    if (stock === "IN_STOCK") {
+      where.isAvailable = true;
+    } else if (stock === "OUT_OF_STOCK") {
+      where.isAvailable = false;
+    }
+
+    const [rawProducts, totalCount, inStockCount, outOfStockCount] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.product.count({ where }),
+      prisma.product.count({ where: { isAvailable: true } }),
+      prisma.product.count({ where: { isAvailable: false } }),
+    ]);
+
+    const products: PaginatedProductItem[] = rawProducts.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      price: p.price.toString(),
+      imageUrl: p.imageUrl,
+      isAvailable: p.isAvailable,
+      category: p.category,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    }));
+
+    return {
+      success: true,
+      data: {
+        products,
+        totalCount,
+        inStockCount,
+        outOfStockCount,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+      },
+    };
+  } catch (error: unknown) {
+    console.error("Error fetching paginated products:", error);
+    const message = error instanceof Error ? error.message : "Failed to load products.";
+    return { success: false, error: message };
+  }
+}
+

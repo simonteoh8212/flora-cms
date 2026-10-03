@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -31,9 +31,10 @@ import {
   toggleProductAvailability,
   deleteProduct,
   seedDemoProducts,
+  getPaginatedProductsAction,
 } from "@/app/admin/actions";
 import { logoutAction } from "@/app/auth/actions";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, cn } from "@/lib/utils";
 
 export interface UserPermissions {
   canView: boolean;
@@ -47,6 +48,9 @@ export interface UserPermissions {
 
 interface AdminProductListProps {
   initialProducts: SerializedProduct[];
+  initialTotalCount?: number;
+  initialInStockCount?: number;
+  initialOutOfStockCount?: number;
   currentUser?: {
     username: string;
     role: string;
@@ -57,6 +61,9 @@ interface AdminProductListProps {
 
 export default function AdminProductList({
   initialProducts,
+  initialTotalCount,
+  initialInStockCount,
+  initialOutOfStockCount,
   currentUser,
   permissions,
 }: AdminProductListProps) {
@@ -71,6 +78,17 @@ export default function AdminProductList({
   };
 
   const [products, setProducts] = useState<SerializedProduct[]>(initialProducts);
+  const [totalCount, setTotalCount] = useState<number>(
+    initialTotalCount ?? initialProducts.length
+  );
+  const [inStockCount, setInStockCount] = useState<number>(
+    initialInStockCount ?? initialProducts.filter((p) => p.isAvailable).length
+  );
+  const [outOfStockCount, setOutOfStockCount] = useState<number>(
+    initialOutOfStockCount ?? initialProducts.filter((p) => !p.isAvailable).length
+  );
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [stockFilter, setStockFilter] = useState<"ALL" | "IN_STOCK" | "OUT_OF_STOCK">("ALL");
@@ -95,47 +113,71 @@ export default function AdminProductList({
     "Dried",
   ];
 
-  // Filtering products
-  const filteredProducts = products.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchesCategory =
-      selectedCategory === "All" ||
-      item.category.toLowerCase() === selectedCategory.toLowerCase();
-
-    const matchesStock =
-      stockFilter === "ALL" ||
-      (stockFilter === "IN_STOCK" && item.isAvailable) ||
-      (stockFilter === "OUT_OF_STOCK" && !item.isAvailable);
-
-    return matchesSearch && matchesCategory && matchesStock;
-  });
-
-  const inStockCount = products.filter((p) => p.isAvailable).length;
-  const outOfStockCount = products.filter((p) => !p.isAvailable).length;
-
-  // Pagination State (10 items per page)
+  // Pagination State - items loaded page by page from DB
+  const ITEMS_PER_PAGE = 3;
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
 
-  // Reset to page 1 whenever filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedCategory, stockFilter]);
-
-  const totalItems = filteredProducts.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
-  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + products.length, totalCount);
+
+  // Fetch page by page from the server action with skip and take
+  const fetchPage = useCallback(
+    async (
+      page: number,
+      search: string = searchQuery,
+      category: string = selectedCategory,
+      stock: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" = stockFilter
+    ) => {
+      setIsLoadingPage(true);
+      try {
+        const res = await getPaginatedProductsAction({
+          page,
+          pageSize: ITEMS_PER_PAGE,
+          search,
+          category,
+          stock,
+        });
+
+        if (res.success && res.data) {
+          setProducts(res.data.products);
+          setTotalCount(res.data.totalCount);
+          setInStockCount(res.data.inStockCount);
+          setOutOfStockCount(res.data.outOfStockCount);
+          setCurrentPage(page);
+        } else if (res.error) {
+          toast.error(res.error);
+        }
+      } catch (err: unknown) {
+        console.error("Failed to load products page:", err);
+      } finally {
+        setIsLoadingPage(false);
+      }
+    },
+    [searchQuery, selectedCategory, stockFilter, ITEMS_PER_PAGE]
+  );
+
+  // Debounced effect for search / category / stock filters
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchPage(1, searchQuery, selectedCategory, stockFilter);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedCategory, stockFilter, fetchPage]);
 
   const handlePageChange = (page: number) => {
     const target = Math.max(1, Math.min(page, totalPages));
-    setCurrentPage(target);
+    if (target === currentPage && !isLoadingPage) return;
+    fetchPage(target, searchQuery, selectedCategory, stockFilter);
     window.scrollTo({ top: 100, behavior: "smooth" });
   };
 
@@ -165,6 +207,8 @@ export default function AdminProductList({
         p.id === product.id ? { ...p, isAvailable: newStatus } : p
       )
     );
+    setInStockCount((prev) => (newStatus ? prev + 1 : Math.max(0, prev - 1)));
+    setOutOfStockCount((prev) => (newStatus ? Math.max(0, prev - 1) : prev + 1));
 
     const res = await toggleProductAvailability(product.id, newStatus);
     if (res.success) {
@@ -174,6 +218,9 @@ export default function AdminProductList({
           : `"${product.name}" marked as Out of Stock`,
         { autoClose: 2000 }
       );
+      if (stockFilter !== "ALL") {
+        fetchPage(currentPage);
+      }
     } else {
       console.warn("Stock toggle notice:", res.error);
       // In demo mode without DB, keep the local toggle visual
@@ -183,6 +230,8 @@ export default function AdminProductList({
             p.id === product.id ? { ...p, isAvailable: !newStatus } : p
           )
         );
+        setInStockCount((prev) => (newStatus ? Math.max(0, prev - 1) : prev + 1));
+        setOutOfStockCount((prev) => (newStatus ? prev + 1 : Math.max(0, prev - 1)));
         toast.error(res.error || "Failed to update stock status.");
       }
     }
@@ -199,8 +248,9 @@ export default function AdminProductList({
     setDeletingId(null);
 
     if (res.success || id.startsWith("sample-")) {
-      setProducts((prev) => prev.filter((p) => p.id !== id));
       toast.success(`Removed "${name}" from catalog.`);
+      const nextPage = products.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      fetchPage(nextPage);
     } else {
       toast.error(res.error || "Failed to delete product.");
     }
@@ -213,7 +263,7 @@ export default function AdminProductList({
     setSeedingLoading(false);
     if (res.success) {
       toast.success("Starter flower catalog seeded successfully!");
-      window.location.reload();
+      fetchPage(1);
     } else {
       toast.error(res.error || "Could not seed catalog.");
     }
@@ -348,7 +398,7 @@ export default function AdminProductList({
             }`}
           >
             <Layers className="w-3 h-3" />
-            <span>All ({products.length})</span>
+            <span>All ({inStockCount + outOfStockCount})</span>
           </button>
 
           <button
@@ -409,14 +459,19 @@ export default function AdminProductList({
         </div>
 
         {/* Product Cards List */}
-        {filteredProducts.length === 0 ? (
+        {isLoadingPage && products.length === 0 ? (
+          <div className="bg-white rounded-3xl p-12 border border-slate-200/80 text-center shadow-ios mt-4 flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+            <p className="text-xs font-semibold text-slate-600">Loading flowers...</p>
+          </div>
+        ) : products.length === 0 ? (
           <div className="bg-white rounded-3xl p-8 border border-slate-200/80 text-center shadow-ios mt-4">
             <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
               <Package className="w-7 h-7" />
             </div>
             <h3 className="text-base font-bold text-slate-900">No flowers found</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-              {searchQuery || selectedCategory !== "All"
+              {searchQuery || selectedCategory !== "All" || stockFilter !== "ALL"
                 ? "Try adjusting your search or category filter."
                 : "Your florist catalog is currently empty. Tap below to add your first floral arrangement or load demo items."}
             </p>
@@ -432,7 +487,7 @@ export default function AdminProductList({
                 <Plus className="w-4 h-4" /> Add First Product
               </button>
 
-              {products.length === 0 && (
+              {totalCount === 0 && (
                 <button
                   onClick={handleSeedCatalog}
                   disabled={seedingLoading}
@@ -445,8 +500,16 @@ export default function AdminProductList({
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {paginatedProducts.map((product) => (
+          <div className={cn("space-y-3 transition-opacity duration-200 relative", isLoadingPage && "opacity-60 pointer-events-none")}>
+            {isLoadingPage && (
+              <div className="absolute inset-0 bg-white/40 backdrop-blur-[0.5px] z-10 flex items-center justify-center rounded-2xl">
+                <div className="bg-slate-900/80 text-white px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-semibold shadow-lg">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                  <span>Loading page...</span>
+                </div>
+              </div>
+            )}
+            {products.map((product) => (
               <div
                 key={product.id}
                 className={`bg-white rounded-2xl p-3 border transition-all shadow-ios flex items-center gap-3.5 ${
@@ -567,8 +630,8 @@ export default function AdminProductList({
               <div className="pt-5 pb-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200/80">
                 {/* Items Counter Summary */}
                 <p className="text-xs text-slate-500 font-medium order-2 sm:order-1">
-                  Showing <span className="font-semibold text-slate-800">{startIndex + 1}–{endIndex}</span> of{" "}
-                  <span className="font-semibold text-slate-800">{totalItems}</span> items
+                  Showing <span className="font-semibold text-slate-800">{totalCount > 0 ? startIndex + 1 : 0}–{endIndex}</span> of{" "}
+                  <span className="font-semibold text-slate-800">{totalCount}</span> items
                 </p>
 
                 {/* Numbered Page Buttons */}
@@ -576,7 +639,7 @@ export default function AdminProductList({
                   {/* Previous Page Button */}
                   <button
                     onClick={() => handlePageChange(safeCurrentPage - 1)}
-                    disabled={safeCurrentPage === 1}
+                    disabled={safeCurrentPage === 1 || isLoadingPage}
                     className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs active:scale-95"
                     title="Previous Page"
                     aria-label="Previous Page"
@@ -604,6 +667,7 @@ export default function AdminProductList({
                       <button
                         key={pageNum}
                         onClick={() => handlePageChange(pageNum)}
+                        disabled={isLoadingPage}
                         className={`min-w-[34px] h-[34px] px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center select-none active:scale-95 ${
                           isActive
                             ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
@@ -619,7 +683,7 @@ export default function AdminProductList({
                   {/* Next Page Button */}
                   <button
                     onClick={() => handlePageChange(safeCurrentPage + 1)}
-                    disabled={safeCurrentPage === totalPages}
+                    disabled={safeCurrentPage === totalPages || isLoadingPage}
                     className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs active:scale-95"
                     title="Next Page"
                     aria-label="Next Page"
@@ -660,7 +724,7 @@ export default function AdminProductList({
         }}
         productToEdit={editingProduct}
         onSuccess={() => {
-          window.location.reload();
+          fetchPage(editingProduct ? currentPage : 1);
         }}
       />
 
