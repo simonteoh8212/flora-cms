@@ -22,11 +22,13 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ReceiptText,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
 import TeamManagementModal from "./TeamManagementModal";
 import RoleManagementModal from "./RoleManagementModal";
+import OrderManagementView from "./OrderManagementView";
 import {
   toggleProductAvailability,
   deleteProduct,
@@ -77,6 +79,7 @@ export default function AdminProductList({
     roleName: currentUser?.role || "Staff",
   };
 
+  const [activeTab, setActiveTab] = useState<"CATALOG" | "ORDERS">("CATALOG");
   const [products, setProducts] = useState<SerializedProduct[]>(initialProducts);
   const [totalCount, setTotalCount] = useState<number>(
     initialTotalCount ?? initialProducts.length
@@ -387,50 +390,87 @@ export default function AdminProductList({
           </div>
         </div>
 
-        {/* Quick Inventory Metrics Pills */}
-        <div className="max-w-xl mx-auto px-4 pb-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => setStockFilter("ALL")}
-            className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all flex-shrink-0 ${
-              stockFilter === "ALL"
-                ? "bg-slate-900 text-white"
-                : "bg-white text-slate-600 border border-slate-200"
-            }`}
-          >
-            <Layers className="w-3 h-3" />
-            <span>All ({inStockCount + outOfStockCount})</span>
-          </button>
+        {/* Navigation Mode Segmented Switcher */}
+        <div className="max-w-xl mx-auto px-4 pb-2.5">
+          <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 shadow-inner">
+            <button
+              onClick={() => setActiveTab("CATALOG")}
+              className={cn(
+                "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 select-none",
+                activeTab === "CATALOG"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <Package className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Flowers Catalog</span>
+            </button>
 
-          <button
-            onClick={() => setStockFilter("IN_STOCK")}
-            className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all flex-shrink-0 ${
-              stockFilter === "IN_STOCK"
-                ? "bg-emerald-700 text-white"
-                : "bg-white text-emerald-700 border border-emerald-200"
-            }`}
-          >
-            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-            <span>In Stock ({inStockCount})</span>
-          </button>
-
-          <button
-            onClick={() => setStockFilter("OUT_OF_STOCK")}
-            className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all flex-shrink-0 ${
-              stockFilter === "OUT_OF_STOCK"
-                ? "bg-slate-800 text-white"
-                : "bg-white text-slate-600 border border-slate-200"
-            }`}
-          >
-            <XCircle className="w-3 h-3 text-rose-500" />
-            <span>Sold Out ({outOfStockCount})</span>
-          </button>
+            <button
+              onClick={() => setActiveTab("ORDERS")}
+              className={cn(
+                "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 select-none",
+                activeTab === "ORDERS"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <ReceiptText className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Orders & Sales</span>
+            </button>
+          </div>
         </div>
+
+        {/* Quick Inventory Metrics Pills (Shown only when in CATALOG mode) */}
+        {activeTab === "CATALOG" && (
+          <div className="max-w-xl mx-auto px-4 pb-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setStockFilter("ALL")}
+              className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all flex-shrink-0 ${
+                stockFilter === "ALL"
+                  ? "bg-slate-900 text-white"
+                  : "bg-white text-slate-600 border border-slate-200"
+              }`}
+            >
+              <Layers className="w-3 h-3" />
+              <span>All ({inStockCount + outOfStockCount})</span>
+            </button>
+
+            <button
+              onClick={() => setStockFilter("IN_STOCK")}
+              className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all flex-shrink-0 ${
+                stockFilter === "IN_STOCK"
+                  ? "bg-emerald-700 text-white"
+                  : "bg-white text-emerald-700 border border-emerald-200"
+              }`}
+            >
+              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+              <span>In Stock ({inStockCount})</span>
+            </button>
+
+            <button
+              onClick={() => setStockFilter("OUT_OF_STOCK")}
+              className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all flex-shrink-0 ${
+                stockFilter === "OUT_OF_STOCK"
+                  ? "bg-slate-800 text-white"
+                  : "bg-white text-slate-600 border border-slate-200"
+              }`}
+            >
+              <XCircle className="w-3 h-3 text-rose-500" />
+              <span>Sold Out ({outOfStockCount})</span>
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content Area */}
       <main className="max-w-xl mx-auto px-4 pt-4 space-y-4">
-        {/* Search Bar */}
-        <div className="relative">
+        {activeTab === "ORDERS" ? (
+          <OrderManagementView />
+        ) : (
+          <>
+            {/* Search Bar */}
+            <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -695,10 +735,12 @@ export default function AdminProductList({
             )}
           </div>
         )}
+          </>
+        )}
       </main>
 
-      {/* iOS Fixed Bottom Navigation / Action Bar (Shown only if role has canAdd permission) */}
-      {perms.canAdd && (
+      {/* iOS Fixed Bottom Navigation / Action Bar (Shown only if role has canAdd permission and on CATALOG tab) */}
+      {perms.canAdd && activeTab === "CATALOG" && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-4 ios-glass border-t border-slate-200/80">
           <div className="max-w-xl mx-auto">
             <button

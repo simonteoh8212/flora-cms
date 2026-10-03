@@ -52,3 +52,27 @@ model Product {
   @@index([category])
   @@index([isAvailable])
 }
+
+model Order {
+  id                String    @id @default(uuid())
+  orderNumber       String    @unique // e.g. "FL-1001"
+  customerName      String
+  customerPhone     String
+  items             String    // e.g. "Emerald Garden Rose Deluxe (x1)"
+  totalAmount       Decimal   @db.Decimal(10, 2)
+  deliveryFee       Decimal   @default(0.00) @db.Decimal(10, 2)
+  paymentMethod     String    @default("DuitNow QR")
+  deliverySlot      String?
+  deliveryAddress   String?
+  cardMessage       String?
+  status            String    @default("PENDING_PAYMENT") // PENDING_PAYMENT, PAID, DELIVERED, CANCELLED
+  googleSheetSynced Boolean   @default(false)
+  syncedAt          DateTime?
+  verifiedBy        String?   // Staff username who confirmed receipt
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
