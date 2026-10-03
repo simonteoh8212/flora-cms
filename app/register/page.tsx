@@ -11,11 +11,16 @@ export const metadata = {
 };
 
 export default async function RegisterPage() {
-  const { hasAdmin, isAuthenticated } = await getSystemAuthStatus();
+  const { hasAdmin, isAuthenticated, currentUser } = await getSystemAuthStatus();
 
   // If an admin already exists and the current visitor is NOT an authenticated admin, deny access
   if (hasAdmin && !isAuthenticated) {
     redirect("/login");
+  }
+
+  // Staff accounts (ADMIN) cannot create other users
+  if (hasAdmin && currentUser?.role === "ADMIN") {
+    redirect("/admin");
   }
 
   return (
@@ -29,15 +34,17 @@ export default async function RegisterPage() {
           Flora Studio
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          {hasAdmin
-            ? "Create an additional administrator account"
-            : "First-time Master Administrator Setup"}
+          {!hasAdmin
+            ? "First-time Developer (Super Admin) Setup"
+            : currentUser?.role === "SUPER_ADMIN"
+            ? "Developer Console: Provision Florist Owner or Staff"
+            : "Master Admin: Register Florist Staff Member"}
         </p>
       </div>
 
       <RegisterForm
         isFirstAdmin={!hasAdmin}
-        isLoggedInAdmin={isAuthenticated}
+        currentUserRole={currentUser?.role ?? null}
       />
     </div>
   );

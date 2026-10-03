@@ -88,13 +88,13 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
                 First-Time Setup Required
               </p>
               <p className="text-[11px] text-emerald-700 mt-0.5">
-                No admin account has been created yet. Create your master admin account to secure the portal.
+                No admin account has been created yet. Create your Developer (Super Admin) account to initialize the portal.
               </p>
               <Link
                 href="/register"
                 className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-white px-3 py-1.5 rounded-full border border-emerald-300 hover:bg-emerald-100 transition-colors shadow-xs"
               >
-                <span>Create Master Admin</span>
+                <span>Create Super Admin</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -234,10 +234,10 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
             {/* Explanation */}
             <div className="text-xs text-slate-600 leading-relaxed space-y-2">
               <p>
-                Flora CMS accounts are managed by your <strong>Master Administrator</strong> (Florist Owner).
+                Flora CMS accounts are managed by your <strong>Florist Owner (Master Admin)</strong> or <strong>Developer (Super Admin)</strong>.
               </p>
               <p className="text-[11px] text-slate-500">
-                The Master Admin can instantly reset your password or issue a temporary login code directly from their iPhone inside the Admin Portal.
+                Your administrator can instantly reset your password or issue a temporary login code directly inside the Admin Portal.
               </p>
             </div>
 

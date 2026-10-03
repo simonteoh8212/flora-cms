@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import AdminProductList from "@/components/AdminProductList";
 import { SerializedProduct } from "@/components/ProductFormModal";
+import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,14 @@ export default async function AdminPage() {
   let products: SerializedProduct[] = [];
   let isDemoFallback = false;
 
+  const session = await getSession();
+  const currentUser = session
+    ? {
+        username: session.username,
+        role: session.role as "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN",
+      }
+    : null;
+
   try {
     const rawProducts = await prisma.product.findMany({
       orderBy: { createdAt: "desc" },
@@ -116,7 +125,7 @@ export default async function AdminPage() {
           <span>✨ <strong>Demo Mode:</strong> Displaying sample florist items. Connect Vercel Postgres to save live changes permanently.</span>
         </div>
       )}
-      <AdminProductList initialProducts={products} />
+      <AdminProductList initialProducts={products} currentUser={currentUser} />
     </div>
   );
 }

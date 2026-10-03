@@ -16,6 +16,8 @@ import {
   UserPlus,
   LogOut,
   Users,
+  ShieldAlert,
+  Crown,
 } from "lucide-react";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
 import TeamManagementModal from "./TeamManagementModal";
@@ -29,10 +31,15 @@ import { formatPrice } from "@/lib/utils";
 
 interface AdminProductListProps {
   initialProducts: SerializedProduct[];
+  currentUser?: {
+    username: string;
+    role: "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN";
+  } | null;
 }
 
 export default function AdminProductList({
   initialProducts,
+  currentUser,
 }: AdminProductListProps) {
   const [products, setProducts] = useState<SerializedProduct[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState("");
@@ -142,12 +149,33 @@ export default function AdminProductList({
               <Package className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight text-slate-900 leading-tight">
-                Flora Studio
-              </h1>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-base font-bold tracking-tight text-slate-900 leading-tight">
+                  Flora Studio
+                </h1>
+                {currentUser?.role === "SUPER_ADMIN" && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-0.5">
+                    <ShieldAlert className="w-2.5 h-2.5" />
+                    <span>Dev</span>
+                  </span>
+                )}
+                {currentUser?.role === "MASTER_ADMIN" && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
+                    <Crown className="w-2.5 h-2.5" />
+                    <span>Owner</span>
+                  </span>
+                )}
+                {currentUser?.role === "ADMIN" && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    Staff
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] font-medium text-emerald-700 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Mobile Catalog Manager
+                {currentUser?.username
+                  ? `@${currentUser.username} • Catalog Manager`
+                  : "Mobile Catalog Manager"}
               </p>
             </div>
           </div>
@@ -156,18 +184,25 @@ export default function AdminProductList({
             <button
               onClick={() => setTeamModalOpen(true)}
               className="p-2 rounded-full text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-              title="Team & Password Reset"
+              title="Team & Access Control"
             >
               <Users className="w-4 h-4" />
             </button>
 
-            <Link
-              href="/register"
-              className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-              title="Register new admin user"
-            >
-              <UserPlus className="w-4 h-4" />
-            </Link>
+            {/* Only Super Admin and Master Admin can register accounts */}
+            {(currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "MASTER_ADMIN") && (
+              <Link
+                href="/register"
+                className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                title={
+                  currentUser?.role === "SUPER_ADMIN"
+                    ? "Create Florist Owner or Staff"
+                    : "Register Florist Staff"
+                }
+              >
+                <UserPlus className="w-4 h-4" />
+              </Link>
+            )}
 
             <button
               onClick={async () => {

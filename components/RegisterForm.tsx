@@ -15,23 +15,29 @@ import {
   UserPlus,
   ShieldCheck,
   ArrowLeft,
+  Crown,
+  ShieldAlert,
 } from "lucide-react";
-import { registerAction } from "@/app/auth/actions";
+import { registerAction, UserRole } from "@/app/auth/actions";
+import { validatePassword } from "@/lib/password-rules";
 
 interface RegisterFormProps {
   isFirstAdmin: boolean;
-  isLoggedInAdmin: boolean;
+  currentUserRole: UserRole | null;
 }
 
 export default function RegisterForm({
   isFirstAdmin,
-  isLoggedInAdmin,
+  currentUserRole,
 }: RegisterFormProps) {
   const router = useRouter();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<UserRole>(
+    currentUserRole === "SUPER_ADMIN" ? "MASTER_ADMIN" : "ADMIN"
+  );
   const [showPassword, setShowPassword] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,19 +62,20 @@ export default function RegisterForm({
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    if (!isFormValid) {
-      if (!hasMinLength || !hasUppercase || !hasNumber) {
-        setErrorMessage("Please fulfill all password requirements.");
-        return;
-      }
-      if (!passwordsMatch) {
-        setErrorMessage("Passwords do not match.");
-        return;
-      }
-      if (username.trim().length < 3) {
-        setErrorMessage("Username must be at least 3 characters.");
-        return;
-      }
+    const check = validatePassword(password);
+    if (!check.isValid) {
+      setErrorMessage(check.error || "Password requirements not met.");
+      return;
+    }
+
+    if (!passwordsMatch) {
+      setErrorMessage("Passwords do not match.");
+      return;
+    }
+
+    if (username.trim().length < 3) {
+      setErrorMessage("Username must be at least 3 characters.");
+      return;
     }
 
     setIsSubmitting(true);
@@ -78,16 +85,25 @@ export default function RegisterForm({
       formData.append("username", username.trim());
       formData.append("password", password);
       formData.append("confirmPassword", confirmPassword);
+      formData.append("role", role);
 
       const res = await registerAction(formData);
 
       if (res.success) {
         if (res.isFirstAdmin) {
-          // First admin automatically logged in
+          // First Super Admin automatically logged in
           router.push("/admin");
           router.refresh();
         } else {
-          setSuccessMessage(`New admin user "${username}" was created successfully!`);
+          setSuccessMessage(
+            `Account for @${username} created with role "${
+              role === "MASTER_ADMIN"
+                ? "Florist Owner (Master Admin)"
+                : role === "SUPER_ADMIN"
+                ? "Developer (Super Admin)"
+                : "Florist Staff"
+            }".`
+          );
           setUsername("");
           setPassword("");
           setConfirmPassword("");
@@ -109,15 +125,21 @@ export default function RegisterForm({
         <div className="mb-5 pb-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              {isFirstAdmin ? "Initial Admin Setup" : "Register Admin User"}
-            </h2>
-            <p className="text-xs text-slate-500">
               {isFirstAdmin
-                ? "Create your master administrator credentials"
-                : "Grant administrative access to a new team member"}
+                ? "Developer Setup (Super Admin)"
+                : currentUserRole === "SUPER_ADMIN"
+                ? "Create Account"
+                : "Register Florist Staff"}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isFirstAdmin
+                ? "Create your Master Developer account with full system access"
+                : currentUserRole === "SUPER_ADMIN"
+                ? "Provision a Florist Owner or team member"
+                : "Add a florist team member to manage catalog"}
             </p>
           </div>
-          {isLoggedInAdmin && (
+          {currentUserRole && (
             <Link
               href="/admin"
               className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
@@ -143,6 +165,64 @@ export default function RegisterForm({
             </div>
           )}
 
+          {/* Role Selector (visible only to SUPER_ADMIN when registering someone else) */}
+          {!isFirstAdmin && currentUserRole === "SUPER_ADMIN" && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Account Role
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setRole("MASTER_ADMIN")}
+                  className={`p-2 rounded-2xl border text-center transition-all ${
+                    role === "MASTER_ADMIN"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-xs"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <Crown className="w-4 h-4 text-emerald-600 mx-auto mb-1" />
+                  <span className="block text-[11px] font-bold leading-tight">Florist Owner</span>
+                  <span className="block text-[9px] text-slate-500 font-normal">
+                    Master Admin
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRole("ADMIN")}
+                  className={`p-2 rounded-2xl border text-center transition-all ${
+                    role === "ADMIN"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-xs"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <User className="w-4 h-4 text-slate-600 mx-auto mb-1" />
+                  <span className="block text-[11px] font-bold leading-tight">Florist Staff</span>
+                  <span className="block text-[9px] text-slate-500 font-normal">
+                    Staff Admin
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRole("SUPER_ADMIN")}
+                  className={`p-2 rounded-2xl border text-center transition-all ${
+                    role === "SUPER_ADMIN"
+                      ? "border-purple-600 bg-purple-50 text-purple-950 font-bold shadow-xs"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <ShieldAlert className="w-4 h-4 text-purple-600 mx-auto mb-1" />
+                  <span className="block text-[11px] font-bold leading-tight">Developer</span>
+                  <span className="block text-[9px] text-slate-500 font-normal">
+                    Super Admin
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Username */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
@@ -154,7 +234,13 @@ export default function RegisterForm({
                 type="text"
                 autoCapitalize="none"
                 autoCorrect="off"
-                placeholder="e.g. floramanager"
+                placeholder={
+                  isFirstAdmin
+                    ? "e.g. dev_admin"
+                    : role === "MASTER_ADMIN"
+                    ? "e.g. florist_owner"
+                    : "e.g. staff_amy"
+                }
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -268,8 +354,8 @@ export default function RegisterForm({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
+              disabled={isSubmitting || !isFormValid}
+              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>
@@ -280,7 +366,11 @@ export default function RegisterForm({
                 <>
                   <UserPlus className="w-4 h-4" />
                   <span>
-                    {isFirstAdmin ? "Complete Setup & Sign In" : "Register Admin"}
+                    {isFirstAdmin
+                      ? "Create Super Admin & Sign In"
+                      : role === "MASTER_ADMIN"
+                      ? "Create Florist Owner Account"
+                      : "Create Staff Account"}
                   </span>
                 </>
               )}
@@ -297,7 +387,12 @@ export default function RegisterForm({
           </Link>
 
           <span className="text-[11px] text-slate-400 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Admin Only
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            {isFirstAdmin
+              ? "Developer Bootstrap"
+              : currentUserRole === "SUPER_ADMIN"
+              ? "Super Admin Mode"
+              : "Master Admin Mode"}
           </span>
         </div>
       </div>

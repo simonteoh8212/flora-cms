@@ -14,13 +14,18 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle2,
+  Crown,
+  ShieldAlert,
+  User,
 } from "lucide-react";
 import {
   getTeamMembersAction,
   resetUserPasswordAction,
   deleteTeamMemberAction,
+  updateUserRoleAction,
   generateRandomPasswordAction,
   TeamMember,
+  UserRole,
 } from "@/app/auth/actions";
 import { validatePassword } from "@/lib/password-rules";
 
@@ -34,9 +39,11 @@ export default function TeamManagementModal({
   onClose,
 }: TeamManagementModalProps) {
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isMasterAdmin, setIsMasterAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
 
   // Reset Password Sub-state
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -64,6 +71,7 @@ export default function TeamManagementModal({
     const res = await getTeamMembersAction();
     if (res.success && res.data) {
       setMembers(res.data.members);
+      setIsSuperAdmin(res.data.isSuperAdmin);
       setIsMasterAdmin(res.data.isMasterAdmin);
       setCurrentUserId(res.data.currentUserId);
     } else {
@@ -99,9 +107,16 @@ export default function TeamManagementModal({
   };
 
   const handleDeleteMember = async (member: TeamMember) => {
+    const roleLabel =
+      member.role === "SUPER_ADMIN"
+        ? "Super Admin"
+        : member.role === "MASTER_ADMIN"
+        ? "Master Admin (Florist Owner)"
+        : "Staff Member";
+
     if (
       !confirm(
-        `Are you sure you want to remove staff member "${member.username}"? They will lose all access.`
+        `Are you sure you want to remove ${roleLabel} "${member.username}"? They will lose all access.`
       )
     ) {
       return;
@@ -115,11 +130,56 @@ export default function TeamManagementModal({
     }
   };
 
+  const handleUpdateRole = async (member: TeamMember, newRole: UserRole) => {
+    if (member.role === newRole) return;
+    setRoleChangingId(member.id);
+    const res = await updateUserRoleAction(member.id, newRole);
+    setRoleChangingId(null);
+
+    if (res.success) {
+      setMembers((prev) =>
+        prev.map((m) => (m.id === member.id ? { ...m, role: newRole } : m))
+      );
+    } else {
+      alert(res.error || "Failed to update role.");
+    }
+  };
+
   const handleCopyPassword = () => {
     if (resetSuccessPassword) {
       navigator.clipboard.writeText(resetSuccessPassword);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const getRoleConfig = (role: UserRole) => {
+    switch (role) {
+      case "SUPER_ADMIN":
+        return {
+          label: "Developer (Super Admin)",
+          shortLabel: "Super Admin",
+          pillBg: "bg-purple-50 text-purple-700 border-purple-200/80",
+          avatarBg: "bg-purple-100 text-purple-800",
+          Icon: ShieldAlert,
+        };
+      case "MASTER_ADMIN":
+        return {
+          label: "Florist Owner (Master Admin)",
+          shortLabel: "Master Admin",
+          pillBg: "bg-emerald-50 text-emerald-800 border-emerald-200/80",
+          avatarBg: "bg-emerald-100 text-emerald-800",
+          Icon: Crown,
+        };
+      case "ADMIN":
+      default:
+        return {
+          label: "Florist Staff",
+          shortLabel: "Florist Staff",
+          pillBg: "bg-slate-100 text-slate-700 border-slate-200/80",
+          avatarBg: "bg-slate-100 text-slate-700",
+          Icon: User,
+        };
     }
   };
 
@@ -143,11 +203,30 @@ export default function TeamManagementModal({
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Team & Access Control
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  Team & Role Access
+                </h2>
+                {isSuperAdmin ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                    🛡️ Developer
+                  </span>
+                ) : isMasterAdmin ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    👑 Florist Owner
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    🌿 Staff
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
-                Manage staff accounts and reset credentials
+                {isSuperAdmin
+                  ? "Full Access • Developer Control of all roles and credentials"
+                  : isMasterAdmin
+                  ? "Florist Owner • Manage staff accounts and reset passwords"
+                  : "View team members"}
               </p>
             </div>
           </div>
@@ -176,7 +255,7 @@ export default function TeamManagementModal({
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                     <KeyRound className="w-4 h-4 text-emerald-600" />
-                    Reset Password for @{selectedMember.username}
+                    <span>Reset Password for @{selectedMember.username}</span>
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     Assign a new secure password or generate a temporary code
@@ -305,39 +384,53 @@ export default function TeamManagementModal({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">
                 <span>Team Members ({members.length})</span>
-                {isMasterAdmin && (
+                {(isSuperAdmin || isMasterAdmin) && (
                   <Link
                     href="/register"
                     className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
                   >
-                    <UserPlus className="w-3.5 h-3.5" /> Add Staff
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>{isSuperAdmin ? "Add Account" : "Add Staff"}</span>
                   </Link>
                 )}
               </div>
 
               {members.map((member) => {
                 const isSelf = member.id === currentUserId;
-                const isTargetMaster = member.role === "MASTER_ADMIN";
+                const roleConfig = getRoleConfig(member.role);
+                const RoleIcon = roleConfig.Icon;
+
+                // Action permissions:
+                // Super Admin: Can reset ANY member (including self, Master Admin, or Staff)
+                // Master Admin: Can reset Staff (ADMIN) or self; NEVER Super Admin
+                const canReset =
+                  isSuperAdmin ||
+                  (isMasterAdmin && (member.role === "ADMIN" || isSelf));
+
+                // Super Admin: Can delete ANY other member
+                // Master Admin: Can delete ONLY Staff (ADMIN)
+                const canDelete =
+                  !isSelf &&
+                  (isSuperAdmin || (isMasterAdmin && member.role === "ADMIN"));
+
+                // Super Admin can change other member roles
+                const canChangeRole = isSuperAdmin && !isSelf;
 
                 return (
                   <div
                     key={member.id}
-                    className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-3"
+                    className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                          isTargetMaster
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${roleConfig.avatarBg}`}
                       >
                         {member.username.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-bold text-slate-900">
-                            {member.username}
+                            @{member.username}
                           </span>
                           {isSelf && (
                             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
@@ -347,21 +440,36 @@ export default function TeamManagementModal({
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              isTargetMaster
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${roleConfig.pillBg}`}
                           >
-                            {isTargetMaster ? "Master Admin" : "Staff Admin"}
+                            <RoleIcon className="w-3 h-3" />
+                            <span>{roleConfig.label}</span>
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Actions for Master Admin */}
-                    {isMasterAdmin && !isTargetMaster && (
-                      <div className="flex items-center gap-1.5">
+                    {/* Actions Area */}
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      {/* Role Selector for Super Admin */}
+                      {canChangeRole && (
+                        <select
+                          value={member.role}
+                          onChange={(e) =>
+                            handleUpdateRole(member, e.target.value as UserRole)
+                          }
+                          disabled={roleChangingId === member.id}
+                          className="text-[11px] font-semibold py-1 px-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                          title="Change user role"
+                        >
+                          <option value="SUPER_ADMIN">🛡️ Developer (Super)</option>
+                          <option value="MASTER_ADMIN">👑 Florist Owner (Master)</option>
+                          <option value="ADMIN">🌿 Florist Staff</option>
+                        </select>
+                      )}
+
+                      {/* Reset Password */}
+                      {canReset && (
                         <button
                           onClick={() => {
                             setSelectedMember(member);
@@ -374,16 +482,19 @@ export default function TeamManagementModal({
                           <KeyRound className="w-3.5 h-3.5" />
                           <span>Reset</span>
                         </button>
+                      )}
 
+                      {/* Delete Member */}
+                      {canDelete && (
                         <button
                           onClick={() => handleDeleteMember(member)}
                           className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Delete staff"
+                          title="Delete user account"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })}

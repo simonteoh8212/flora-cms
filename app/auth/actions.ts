@@ -3,14 +3,15 @@
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import {
-  validatePassword,
   hashPassword,
   verifyPassword,
   createSession,
   destroySession,
   getSession,
-  generateTemporaryPassword,
 } from "@/lib/auth";
+import { validatePassword, generateTemporaryPassword } from "@/lib/password-rules";
+
+export type UserRole = "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN";
 
 export type AuthActionResult<T = unknown> = {
   success: boolean;
@@ -22,7 +23,7 @@ export type AuthActionResult<T = unknown> = {
 export interface TeamMember {
   id: string;
   username: string;
-  role: string;
+  role: UserRole;
   createdAt: string;
 }
 
@@ -67,7 +68,10 @@ export async function loginAction(formData: FormData): Promise<AuthActionResult>
 }
 
 /**
- * Register action: Only admin can access, or initial setup if no admin exists yet
+ * Register action:
+ * - If 0 users in DB: Creates initial SUPER_ADMIN (Developer)
+ * - If caller is SUPER_ADMIN: Can register SUPER_ADMIN, MASTER_ADMIN, or ADMIN
+ * - If caller is MASTER_ADMIN: Can register ADMIN (Staff)
  */
 export async function registerAction(
   formData: FormData
@@ -76,6 +80,7 @@ export async function registerAction(
     const username = formData.get("username")?.toString().trim().toLowerCase();
     const password = formData.get("password")?.toString();
     const confirmPassword = formData.get("confirmPassword")?.toString();
+    const requestedRole = (formData.get("role")?.toString() || "ADMIN") as UserRole;
 
     if (!username) {
       return { success: false, error: "Username is required." };
@@ -102,16 +107,35 @@ export async function registerAction(
       return { success: false, error: "Passwords do not match." };
     }
 
-    // Security Gate: Check if users exist in the database
     const totalUsers = await prisma.user.count();
 
-    if (totalUsers > 0) {
-      // If an admin already exists, check that caller is an authenticated admin
+    let assignedRole: UserRole = "ADMIN";
+
+    if (totalUsers === 0) {
+      // Very first user is always the SUPER_ADMIN (Developer)
+      assignedRole = "SUPER_ADMIN";
+    } else {
+      // Must be logged in as SUPER_ADMIN or MASTER_ADMIN
       const currentSession = await getSession();
-      if (!currentSession || (currentSession.role !== "ADMIN" && currentSession.role !== "MASTER_ADMIN")) {
+      if (!currentSession) {
         return {
           success: false,
-          error: "Unauthorized: Only an active admin can register new accounts.",
+          error: "Unauthorized: Please log in as an administrator.",
+        };
+      }
+
+      if (currentSession.role === "SUPER_ADMIN") {
+        // Super admin can create any role
+        assignedRole = ["SUPER_ADMIN", "MASTER_ADMIN", "ADMIN"].includes(requestedRole)
+          ? requestedRole
+          : "MASTER_ADMIN";
+      } else if (currentSession.role === "MASTER_ADMIN") {
+        // Master admin can only create staff (ADMIN)
+        assignedRole = "ADMIN";
+      } else {
+        return {
+          success: false,
+          error: "Unauthorized: Staff accounts cannot create other users.",
         };
       }
     }
@@ -125,14 +149,12 @@ export async function registerAction(
       return { success: false, error: "This username is already taken." };
     }
 
-    // Hash password & store. The very first user is the MASTER_ADMIN
-    const role = totalUsers === 0 ? "MASTER_ADMIN" : "ADMIN";
     const hashedPassword = await hashPassword(password as string);
     const newUser = await prisma.user.create({
       data: {
         username,
         password: hashedPassword,
-        role,
+        role: assignedRole,
       },
     });
 
@@ -172,7 +194,13 @@ export async function getSystemAuthStatus() {
     return {
       hasAdmin: count > 0,
       isAuthenticated: Boolean(session),
-      currentUser: session ? { username: session.username, role: session.role } : null,
+      currentUser: session
+        ? {
+            username: session.username,
+            role: session.role as UserRole,
+            userId: session.userId,
+          }
+        : null,
     };
   } catch (error) {
     console.warn("Auth status check fallback:", error);
@@ -185,10 +213,16 @@ export async function getSystemAuthStatus() {
 }
 
 /**
- * Fetch all team members (passwords omitted) for Team Management in Admin Portal
+ * Fetch all team members for Team Management modal
  */
 export async function getTeamMembersAction(): Promise<
-  AuthActionResult<{ members: TeamMember[]; isMasterAdmin: boolean; currentUserId: string }>
+  AuthActionResult<{
+    members: TeamMember[];
+    currentUserRole: UserRole;
+    isSuperAdmin: boolean;
+    isMasterAdmin: boolean;
+    currentUserId: string;
+  }>
 > {
   try {
     const session = await getSession();
@@ -206,18 +240,19 @@ export async function getTeamMembersAction(): Promise<
       },
     });
 
-    // If only one user exists and has role ADMIN, ensure they are promoted to MASTER_ADMIN
-    if (users.length === 1 && users[0].role === "ADMIN") {
+    // If only one user exists in the system, ensure they are SUPER_ADMIN
+    if (users.length === 1 && users[0].role !== "SUPER_ADMIN") {
       await prisma.user.update({
         where: { id: users[0].id },
-        data: { role: "MASTER_ADMIN" },
+        data: { role: "SUPER_ADMIN" },
       });
-      users[0].role = "MASTER_ADMIN";
+      users[0].role = "SUPER_ADMIN";
     }
 
-    const isMasterAdmin =
-      session.role === "MASTER_ADMIN" ||
-      users.find((u) => u.id === session.userId)?.role === "MASTER_ADMIN";
+    const currentUser = users.find((u) => u.id === session.userId);
+    const currentUserRole = (currentUser?.role || session.role || "ADMIN") as UserRole;
+    const isSuperAdmin = currentUserRole === "SUPER_ADMIN";
+    const isMasterAdmin = currentUserRole === "MASTER_ADMIN";
 
     return {
       success: true,
@@ -225,10 +260,12 @@ export async function getTeamMembersAction(): Promise<
         members: users.map((u) => ({
           id: u.id,
           username: u.username,
-          role: u.role,
+          role: u.role as UserRole,
           createdAt: u.createdAt.toISOString(),
         })),
-        isMasterAdmin: Boolean(isMasterAdmin),
+        currentUserRole,
+        isSuperAdmin,
+        isMasterAdmin,
         currentUserId: session.userId,
       },
     };
@@ -240,7 +277,9 @@ export async function getTeamMembersAction(): Promise<
 }
 
 /**
- * Master Admin resets a staff member's password
+ * Reset User Password
+ * - SUPER_ADMIN: Can reset anyone (Master Admin, Staff, or self)
+ * - MASTER_ADMIN: Can reset only ADMIN (Staff)
  */
 export async function resetUserPasswordAction(
   targetUserId: string,
@@ -252,16 +291,12 @@ export async function resetUserPasswordAction(
       return { success: false, error: "Unauthorized: Please log in." };
     }
 
-    // Verify caller has MASTER_ADMIN privileges
     const caller = await prisma.user.findUnique({
       where: { id: session.userId },
     });
 
-    if (!caller || caller.role !== "MASTER_ADMIN") {
-      return {
-        success: false,
-        error: "Permission denied: Only the Master Admin can reset staff passwords.",
-      };
+    if (!caller) {
+      return { success: false, error: "Caller account not found." };
     }
 
     const targetUser = await prisma.user.findUnique({
@@ -269,14 +304,30 @@ export async function resetUserPasswordAction(
     });
 
     if (!targetUser) {
-      return { success: false, error: "Target staff user not found." };
+      return { success: false, error: "Target user not found." };
     }
 
-    // Prevent changing another master admin if multiple existed
-    if (targetUser.role === "MASTER_ADMIN" && targetUser.id !== caller.id) {
+    // Role-based privilege validation
+    if (caller.role === "SUPER_ADMIN") {
+      // Super Admin has full unrestricted access
+    } else if (caller.role === "MASTER_ADMIN") {
+      // Master Admin can only reset staff (ADMIN)
+      if (targetUser.role === "SUPER_ADMIN") {
+        return {
+          success: false,
+          error: "Permission denied: Master Admin cannot reset the Developer / Super Admin account.",
+        };
+      }
+      if (targetUser.role === "MASTER_ADMIN" && targetUser.id !== caller.id) {
+        return {
+          success: false,
+          error: "Permission denied: Cannot reset credentials for another Master Admin.",
+        };
+      }
+    } else {
       return {
         success: false,
-        error: "Cannot reset password for another Master Admin.",
+        error: "Permission denied: Staff accounts cannot reset passwords.",
       };
     }
 
@@ -301,7 +352,9 @@ export async function resetUserPasswordAction(
 }
 
 /**
- * Master Admin deletes a staff member
+ * Delete User Account
+ * - SUPER_ADMIN: Can delete anyone (except self)
+ * - MASTER_ADMIN: Can delete only ADMIN (Staff)
  */
 export async function deleteTeamMemberAction(
   targetUserId: string
@@ -320,10 +373,31 @@ export async function deleteTeamMemberAction(
       where: { id: session.userId },
     });
 
-    if (!caller || caller.role !== "MASTER_ADMIN") {
+    if (!caller) {
+      return { success: false, error: "Caller not found." };
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      return { success: false, error: "User not found." };
+    }
+
+    if (caller.role === "SUPER_ADMIN") {
+      // Super Admin can delete anyone except self
+    } else if (caller.role === "MASTER_ADMIN") {
+      if (targetUser.role === "SUPER_ADMIN" || targetUser.role === "MASTER_ADMIN") {
+        return {
+          success: false,
+          error: "Permission denied: Master Admin can only remove Staff accounts.",
+        };
+      }
+    } else {
       return {
         success: false,
-        error: "Permission denied: Only the Master Admin can delete accounts.",
+        error: "Permission denied: Staff cannot delete accounts.",
       };
     }
 
@@ -335,6 +409,38 @@ export async function deleteTeamMemberAction(
   } catch (error: unknown) {
     console.error("Error deleting member:", error);
     const message = error instanceof Error ? error.message : "Failed to delete user.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Change User Role (SUPER_ADMIN only)
+ */
+export async function updateUserRoleAction(
+  targetUserId: string,
+  newRole: UserRole
+): Promise<AuthActionResult> {
+  try {
+    const session = await getSession();
+    if (!session) return { success: false, error: "Unauthorized." };
+
+    const caller = await prisma.user.findUnique({ where: { id: session.userId } });
+    if (!caller || caller.role !== "SUPER_ADMIN") {
+      return {
+        success: false,
+        error: "Permission denied: Only Super Admin can change user roles.",
+      };
+    }
+
+    await prisma.user.update({
+      where: { id: targetUserId },
+      data: { role: newRole },
+    });
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Error updating role:", error);
+    const message = error instanceof Error ? error.message : "Failed to update role.";
     return { success: false, error: message };
   }
 }
