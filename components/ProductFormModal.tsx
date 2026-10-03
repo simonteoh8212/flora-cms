@@ -97,6 +97,32 @@ export default function ProductFormModal({
     onClose,
   });
 
+  // Sync state whenever productToEdit or isOpen changes
+  useEffect(() => {
+    if (isOpen) {
+      if (productToEdit) {
+        setName(productToEdit.name || "");
+        setDescription(productToEdit.description || "");
+        setPrice(productToEdit.price || "");
+        setCategory(productToEdit.category || "Bouquet");
+        setIsAvailable(productToEdit.isAvailable ?? true);
+        setImageFile(null);
+        setPreviewUrl(productToEdit.imageUrl || "");
+        setImageUrlDirect(productToEdit.imageUrl || "");
+      } else {
+        setName("");
+        setDescription("");
+        setPrice("");
+        setCategory("Bouquet");
+        setIsAvailable(true);
+        setImageFile(null);
+        setPreviewUrl("");
+        setImageUrlDirect("");
+      }
+      setErrorMessage(null);
+    }
+  }, [productToEdit, isOpen]);
+
   // Close on Escape key press
   useEffect(() => {
     if (!isMounted) return;
