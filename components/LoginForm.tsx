@@ -43,24 +43,32 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [resetUsername, setResetUsername] = useState("");
 
-  const { sheetStyle, dragHandleProps, backdropProps, isDragging } = useBottomSheet({
+  const {
+    isMounted: isForgotMounted,
+    isVisible: isForgotVisible,
+    handleClose: handleCloseForgot,
+    sheetStyle: forgotSheetStyle,
+    dragHandleProps: forgotDragProps,
+    backdropProps: forgotBackdropProps,
+    isDragging: isForgotDragging,
+  } = useBottomSheet({
     isOpen: forgotModalOpen,
     onClose: () => setForgotModalOpen(false),
   });
 
   // Close forgot password modal on Escape key press
   useEffect(() => {
-    if (!forgotModalOpen) return;
+    if (!isForgotMounted) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setForgotModalOpen(false);
+        handleCloseForgot();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [forgotModalOpen]);
+  }, [isForgotMounted, handleCloseForgot]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -255,20 +263,26 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
       </div>
 
       {/* Forgot Password Modal (Option 1: Master Admin Reset Flow) */}
-      {forgotModalOpen && (
+      {isForgotMounted && (
         <div
-          onClick={() => setForgotModalOpen(false)}
-          {...backdropProps}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer touch-none"
+          onClick={handleCloseForgot}
+          {...forgotBackdropProps}
+          className={cn(
+            "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs cursor-pointer touch-none sheet-backdrop",
+            isForgotVisible && "sheet-backdrop-visible"
+          )}
         >
           <div
-            className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 cursor-default overscroll-contain"
+            className={cn(
+              "w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 cursor-default overscroll-contain sheet-modal",
+              isForgotVisible && "sheet-modal-visible"
+            )}
             onClick={(e) => e.stopPropagation()}
-            style={sheetStyle}
+            style={forgotSheetStyle}
           >
             {/* iOS Dragger / Grabber */}
             <div
-              {...dragHandleProps}
+              {...forgotDragProps}
               className="flex sm:hidden justify-center -mt-2 pb-2 cursor-grab active:cursor-grabbing touch-none select-none"
               aria-label="Drag to dismiss"
               role="button"
@@ -277,7 +291,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
               <div
                 className={cn(
                   "h-1.5 rounded-full transition-all duration-150",
-                  isDragging
+                  isForgotDragging
                     ? "w-14 bg-slate-400 scale-105"
                     : "w-11 bg-slate-300 hover:bg-slate-400"
                 )}
@@ -286,7 +300,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
 
             {/* Header */}
             <div
-              {...dragHandleProps}
+              {...forgotDragProps}
               className="flex items-center justify-between border-b border-slate-100 pb-3 select-none touch-none"
             >
               <div className="flex items-center gap-2">
@@ -299,7 +313,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
               </div>
               <button
                 type="button"
-                onClick={() => setForgotModalOpen(false)}
+                onClick={handleCloseForgot}
                 className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -344,7 +358,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
 
               <button
                 type="button"
-                onClick={() => setForgotModalOpen(false)}
+                onClick={handleCloseForgot}
                 className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
               >
                 Back to Sign In

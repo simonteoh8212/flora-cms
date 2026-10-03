@@ -65,7 +65,15 @@ export default function TeamManagementModal({
   const hasNumber = /[0-9]/.test(newPassword);
   const isPasswordValid = hasMinLength && hasUppercase && hasNumber;
 
-  const { sheetStyle, dragHandleProps, backdropProps, isDragging } = useBottomSheet({
+  const {
+    isMounted,
+    isVisible,
+    handleClose,
+    sheetStyle,
+    dragHandleProps,
+    backdropProps,
+    isDragging,
+  } = useBottomSheet({
     isOpen,
     onClose,
   });
@@ -78,21 +86,21 @@ export default function TeamManagementModal({
 
   // Close on Escape key press (or cancel password reset sub-view)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isMounted) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isResetting) {
         if (selectedMember) {
           setSelectedMember(null);
         } else {
-          onClose();
+          handleClose();
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isResetting, selectedMember, onClose]);
+  }, [isMounted, isResetting, selectedMember, handleClose]);
 
   const loadTeam = async () => {
     setLoading(true);
@@ -223,18 +231,24 @@ export default function TeamManagementModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isMounted) return null;
 
   return (
     <div
       onClick={() => {
-        if (!isResetting) onClose();
+        if (!isResetting) handleClose();
       }}
       {...backdropProps}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer touch-none"
+      className={cn(
+        "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs cursor-pointer touch-none sheet-backdrop",
+        isVisible && "sheet-backdrop-visible"
+      )}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden cursor-default overscroll-contain"
+        className={cn(
+          "w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden cursor-default overscroll-contain sheet-modal",
+          isVisible && "sheet-modal-visible"
+        )}
         onClick={(e) => e.stopPropagation()}
         style={sheetStyle}
       >
@@ -295,7 +309,7 @@ export default function TeamManagementModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />

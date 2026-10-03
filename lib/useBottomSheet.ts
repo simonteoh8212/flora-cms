@@ -13,23 +13,59 @@ export function useBottomSheet({
   onClose,
   dismissThreshold = 80,
 }: UseBottomSheetOptions) {
+  const [isMounted, setIsMounted] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(false);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
 
   const startYRef = useRef(0);
   const startTimeRef = useRef(0);
   const currentDragYRef = useRef(0);
   const isDraggingRef = useRef(false);
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Rock-solid Body Scroll Lock: prevent background scrolling when modal is open
+  // Smooth close action that triggers exit animation before notifying parent
+  const handleClose = useCallback(() => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setIsVisible(false);
+    setDragY(0);
+    currentDragYRef.current = 0;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+
+    closeTimerRef.current = setTimeout(() => {
+      setIsMounted(false);
+      onClose();
+    }, 320);
+  }, [onClose]);
+
+  // Synchronize with parent's isOpen prop
   useEffect(() => {
-    if (!isOpen) {
-      setDragY(0);
-      setIsDragging(false);
-      setIsClosing(false);
-      return;
+    if (isOpen) {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+      setIsMounted(true);
+      // Double rAF ensures the browser paints initial off-screen transform before animating in
+      const frame1 = requestAnimationFrame(() => {
+        const frame2 = requestAnimationFrame(() => {
+          setIsVisible(true);
+        });
+        return () => cancelAnimationFrame(frame2);
+      });
+      return () => cancelAnimationFrame(frame1);
+    } else {
+      if (isMounted) {
+        setIsVisible(false);
+        const timer = setTimeout(() => {
+          setIsMounted(false);
+        }, 320);
+        return () => clearTimeout(timer);
+      }
     }
+  }, [isOpen, isMounted]);
+
+  // Rock-solid Body Scroll Lock: prevent background scrolling when bottom sheet is open
+  useEffect(() => {
+    if (!isMounted) return;
 
     const originalBodyOverflow = document.body.style.overflow;
     const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -44,9 +80,9 @@ export function useBottomSheet({
       document.documentElement.style.overflow = originalHtmlOverflow;
       document.body.style.touchAction = originalBodyTouchAction;
     };
-  }, [isOpen]);
+  }, [isMounted]);
 
-  // 2. Global window listeners when dragging so finger can move anywhere on screen
+  // Global window listeners when actively dragging
   useEffect(() => {
     if (!isDragging) return;
 
@@ -75,14 +111,11 @@ export function useBottomSheet({
       const finalDeltaY = currentDragYRef.current;
       const velocity = finalDeltaY / elapsed; // px per millisecond
 
-      // If dragged past threshold or flicked downwards
+      // If dragged past threshold or flicked downwards with speed
       if (finalDeltaY > dismissThreshold || (velocity > 0.35 && finalDeltaY > 25)) {
-        setIsClosing(true);
-        setTimeout(() => {
-          onClose();
-        }, 150);
+        handleClose();
       } else {
-        // Smoothly snap back to origin
+        // Snap back smoothly
         setDragY(0);
         currentDragYRef.current = 0;
       }
@@ -105,7 +138,7 @@ export function useBottomSheet({
       window.removeEventListener("pointerup", handleWindowPointerUp);
       window.removeEventListener("pointercancel", handleWindowPointerCancel);
     };
-  }, [isDragging, dismissThreshold, onClose]);
+  }, [isDragging, dismissThreshold, handleClose]);
 
   // Handle pointer down on the dragger or header
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
@@ -124,16 +157,17 @@ export function useBottomSheet({
     setIsDragging(true);
   }, []);
 
-  const sheetStyle: CSSProperties = {
-    transform: isClosing
-      ? "translateY(100%)"
-      : dragY !== 0
-      ? `translateY(${Math.max(0, dragY)}px)`
-      : undefined,
-    transition: isDragging
-      ? "none"
-      : "transform 0.24s cubic-bezier(0.32, 0.72, 0, 1)",
-  };
+  const sheetStyle: CSSProperties = isDragging
+    ? {
+        transform: `translateY(${Math.max(0, dragY)}px)`,
+        transition: "none",
+      }
+    : dragY !== 0
+    ? {
+        transform: "translateY(0)",
+        transition: "transform 260ms cubic-bezier(0.16, 1, 0.3, 1)",
+      }
+    : {};
 
   const dragHandleProps = {
     onPointerDown: handlePointerDown,
@@ -150,6 +184,9 @@ export function useBottomSheet({
   };
 
   return {
+    isMounted,
+    isVisible,
+    handleClose,
     sheetStyle,
     dragHandleProps,
     backdropProps,
