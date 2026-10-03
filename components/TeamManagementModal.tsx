@@ -68,6 +68,24 @@ export default function TeamManagementModal({
     }
   }, [isOpen]);
 
+  // Close on Escape key press (or cancel password reset sub-view)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isResetting) {
+        if (selectedMember) {
+          setSelectedMember(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isResetting, selectedMember, onClose]);
+
   const loadTeam = async () => {
     setLoading(true);
     setErrorMessage(null);
@@ -190,9 +208,14 @@ export default function TeamManagementModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      onClick={() => {
+        if (!isResetting) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+    >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* iOS Grabber */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -39,6 +39,20 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
   // Forgot Password Modal State
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [resetUsername, setResetUsername] = useState("");
+
+  // Close forgot password modal on Escape key press
+  useEffect(() => {
+    if (!forgotModalOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setForgotModalOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [forgotModalOpen]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -230,9 +244,12 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
 
       {/* Forgot Password Modal (Option 1: Master Admin Reset Flow) */}
       {forgotModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+        <div
+          onClick={() => setForgotModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+        >
           <div
-            className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4"
+            className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
