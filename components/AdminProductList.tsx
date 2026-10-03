@@ -114,7 +114,7 @@ export default function AdminProductList({
   ];
 
   // Pagination State - items loaded page by page from DB
-  const ITEMS_PER_PAGE = 3;
+  const ITEMS_PER_PAGE = 5;
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
