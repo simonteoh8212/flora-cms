@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Plus,
   Search,
@@ -12,6 +13,8 @@ import {
   XCircle,
   Package,
   Layers,
+  UserPlus,
+  LogOut,
 } from "lucide-react";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
 import {
@@ -19,6 +22,7 @@ import {
   deleteProduct,
   seedDemoProducts,
 } from "@/app/admin/actions";
+import { logoutAction } from "@/app/auth/actions";
 import { formatPrice } from "@/lib/utils";
 
 interface AdminProductListProps {
@@ -145,13 +149,31 @@ export default function AdminProductList({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/register"
+              className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+              title="Register new admin user"
+            >
+              <UserPlus className="w-4 h-4" />
+            </Link>
+
+            <button
+              onClick={async () => {
+                await logoutAction();
+              }}
+              className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              title="Log out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+
             <button
               onClick={() => {
                 setEditingProduct(null);
                 setModalOpen(true);
               }}
-              className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-emerald-600/20 active:scale-95"
+              className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-emerald-600/20 active:scale-95 ml-1"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Item</span>
