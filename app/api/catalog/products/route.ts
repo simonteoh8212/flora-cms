@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
 };
 
 export async function OPTIONS() {
@@ -33,10 +39,7 @@ export async function GET() {
     }));
 
     return NextResponse.json(formatted, {
-      headers: {
-        ...corsHeaders,
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
-      },
+      headers: corsHeaders,
     });
   } catch (error: unknown) {
     console.error("Error fetching catalog products:", error);

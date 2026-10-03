@@ -72,6 +72,7 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
     });
 
     revalidatePath("/admin");
+    revalidatePath("/api/catalog/products");
 
     return {
       success: true,
@@ -145,6 +146,7 @@ export async function updateProduct(
     });
 
     revalidatePath("/admin");
+    revalidatePath("/api/catalog/products");
 
     return {
       success: true,
@@ -182,6 +184,7 @@ export async function toggleProductAvailability(
     });
 
     revalidatePath("/admin");
+    revalidatePath("/api/catalog/products");
 
     return {
       success: true,
@@ -215,6 +218,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
     });
 
     revalidatePath("/admin");
+    revalidatePath("/api/catalog/products");
 
     return { success: true };
   } catch (error: unknown) {
