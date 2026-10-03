@@ -15,8 +15,10 @@ import {
   Layers,
   UserPlus,
   LogOut,
+  Users,
 } from "lucide-react";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
+import TeamManagementModal from "./TeamManagementModal";
 import {
   toggleProductAvailability,
   deleteProduct,
@@ -39,6 +41,7 @@ export default function AdminProductList({
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<SerializedProduct | null>(null);
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [seedingLoading, setSeedingLoading] = useState(false);
@@ -150,6 +153,14 @@ export default function AdminProductList({
           </div>
 
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setTeamModalOpen(true)}
+              className="p-2 rounded-full text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+              title="Team & Password Reset"
+            >
+              <Users className="w-4 h-4" />
+            </button>
+
             <Link
               href="/register"
               className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
@@ -423,6 +434,12 @@ export default function AdminProductList({
         onSuccess={() => {
           window.location.reload();
         }}
+      />
+
+      {/* Team Management & Password Reset Modal */}
+      <TeamManagementModal
+        isOpen={teamModalOpen}
+        onClose={() => setTeamModalOpen(false)}
       />
     </div>
   );

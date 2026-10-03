@@ -9,13 +9,22 @@ import {
   createSession,
   destroySession,
   getSession,
+  generateTemporaryPassword,
 } from "@/lib/auth";
 
-export type AuthActionResult = {
+export type AuthActionResult<T = unknown> = {
   success: boolean;
+  data?: T;
   error?: string;
   isFirstAdmin?: boolean;
 };
+
+export interface TeamMember {
+  id: string;
+  username: string;
+  role: string;
+  createdAt: string;
+}
 
 /**
  * Login action
@@ -99,7 +108,7 @@ export async function registerAction(
     if (totalUsers > 0) {
       // If an admin already exists, check that caller is an authenticated admin
       const currentSession = await getSession();
-      if (!currentSession || currentSession.role !== "ADMIN") {
+      if (!currentSession || (currentSession.role !== "ADMIN" && currentSession.role !== "MASTER_ADMIN")) {
         return {
           success: false,
           error: "Unauthorized: Only an active admin can register new accounts.",
@@ -116,13 +125,14 @@ export async function registerAction(
       return { success: false, error: "This username is already taken." };
     }
 
-    // Hash password & store
+    // Hash password & store. The very first user is the MASTER_ADMIN
+    const role = totalUsers === 0 ? "MASTER_ADMIN" : "ADMIN";
     const hashedPassword = await hashPassword(password as string);
     const newUser = await prisma.user.create({
       data: {
         username,
         password: hashedPassword,
-        role: "ADMIN",
+        role,
       },
     });
 
@@ -172,4 +182,166 @@ export async function getSystemAuthStatus() {
       currentUser: null,
     };
   }
+}
+
+/**
+ * Fetch all team members (passwords omitted) for Team Management in Admin Portal
+ */
+export async function getTeamMembersAction(): Promise<
+  AuthActionResult<{ members: TeamMember[]; isMasterAdmin: boolean; currentUserId: string }>
+> {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return { success: false, error: "Unauthorized: Please log in." };
+    }
+
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    // If only one user exists and has role ADMIN, ensure they are promoted to MASTER_ADMIN
+    if (users.length === 1 && users[0].role === "ADMIN") {
+      await prisma.user.update({
+        where: { id: users[0].id },
+        data: { role: "MASTER_ADMIN" },
+      });
+      users[0].role = "MASTER_ADMIN";
+    }
+
+    const isMasterAdmin =
+      session.role === "MASTER_ADMIN" ||
+      users.find((u) => u.id === session.userId)?.role === "MASTER_ADMIN";
+
+    return {
+      success: true,
+      data: {
+        members: users.map((u) => ({
+          id: u.id,
+          username: u.username,
+          role: u.role,
+          createdAt: u.createdAt.toISOString(),
+        })),
+        isMasterAdmin: Boolean(isMasterAdmin),
+        currentUserId: session.userId,
+      },
+    };
+  } catch (error: unknown) {
+    console.error("Error fetching team members:", error);
+    const message = error instanceof Error ? error.message : "Failed to load team members.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Master Admin resets a staff member's password
+ */
+export async function resetUserPasswordAction(
+  targetUserId: string,
+  newPassword: string
+): Promise<AuthActionResult> {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return { success: false, error: "Unauthorized: Please log in." };
+    }
+
+    // Verify caller has MASTER_ADMIN privileges
+    const caller = await prisma.user.findUnique({
+      where: { id: session.userId },
+    });
+
+    if (!caller || caller.role !== "MASTER_ADMIN") {
+      return {
+        success: false,
+        error: "Permission denied: Only the Master Admin can reset staff passwords.",
+      };
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      return { success: false, error: "Target staff user not found." };
+    }
+
+    // Prevent changing another master admin if multiple existed
+    if (targetUser.role === "MASTER_ADMIN" && targetUser.id !== caller.id) {
+      return {
+        success: false,
+        error: "Cannot reset password for another Master Admin.",
+      };
+    }
+
+    // Validate new password rules: min 8, uppercase, number
+    const passwordCheck = validatePassword(newPassword);
+    if (!passwordCheck.isValid) {
+      return { success: false, error: passwordCheck.error };
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: targetUserId },
+      data: { password: hashedPassword },
+    });
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Error resetting password:", error);
+    const message = error instanceof Error ? error.message : "Failed to reset password.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Master Admin deletes a staff member
+ */
+export async function deleteTeamMemberAction(
+  targetUserId: string
+): Promise<AuthActionResult> {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return { success: false, error: "Unauthorized." };
+    }
+
+    if (session.userId === targetUserId) {
+      return { success: false, error: "You cannot delete your own account." };
+    }
+
+    const caller = await prisma.user.findUnique({
+      where: { id: session.userId },
+    });
+
+    if (!caller || caller.role !== "MASTER_ADMIN") {
+      return {
+        success: false,
+        error: "Permission denied: Only the Master Admin can delete accounts.",
+      };
+    }
+
+    await prisma.user.delete({
+      where: { id: targetUserId },
+    });
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Error deleting member:", error);
+    const message = error instanceof Error ? error.message : "Failed to delete user.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Helper to generate random compliant password
+ */
+export async function generateRandomPasswordAction(): Promise<{ password: string }> {
+  return { password: generateTemporaryPassword() };
 }

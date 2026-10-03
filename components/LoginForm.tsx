@@ -13,6 +13,9 @@ import {
   Loader2,
   Sparkles,
   ShieldCheck,
+  MessageCircle,
+  X,
+  HelpCircle,
 } from "lucide-react";
 import { loginAction } from "@/app/auth/actions";
 
@@ -30,6 +33,10 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Forgot Password Modal State
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [resetUsername, setResetUsername] = useState("");
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -61,6 +68,12 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getWhatsAppResetLink = () => {
+    const userToReport = resetUsername.trim() || username.trim() || "[my username]";
+    const message = `Hi! 🌸 I forgot my Flora CMS password for username "${userToReport}". Could you please reset it for me in the Admin Portal?`;
+    return `https://wa.me/?text=${encodeURIComponent(message)}`;
   };
 
   return (
@@ -112,7 +125,10 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
                 autoCorrect="off"
                 placeholder="Enter your username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setResetUsername(e.target.value);
+                }}
                 required
                 className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               />
@@ -121,9 +137,21 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
 
           {/* Password Field */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetUsername(username);
+                  setForgotModalOpen(true);
+                }}
+                className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
+              >
+                Forgot Password?
+              </button>
+            </div>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -176,6 +204,80 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
           <span>Protected Florist CMS • Admin Access Only</span>
         </div>
       </div>
+
+      {/* Forgot Password Modal (Option 1: Master Admin Reset Flow) */}
+      {forgotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <HelpCircle className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Password Recovery
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForgotModalOpen(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Explanation */}
+            <div className="text-xs text-slate-600 leading-relaxed space-y-2">
+              <p>
+                Flora CMS accounts are managed by your <strong>Master Administrator</strong> (Florist Owner).
+              </p>
+              <p className="text-[11px] text-slate-500">
+                The Master Admin can instantly reset your password or issue a temporary login code directly from their iPhone inside the Admin Portal.
+              </p>
+            </div>
+
+            {/* Username Input for WhatsApp pre-fill */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                Your Username (optional)
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your username"
+                value={resetUsername}
+                onChange={(e) => setResetUsername(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-2">
+              <a
+                href={getWhatsAppResetLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 px-4 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] text-white text-xs font-bold shadow-md shadow-green-600/20 transition-all flex items-center justify-center gap-2"
+              >
+                <MessageCircle className="w-4 h-4 fill-white" />
+                <span>Request Reset via WhatsApp</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setForgotModalOpen(false)}
+                className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
