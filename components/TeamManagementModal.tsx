@@ -30,6 +30,8 @@ import {
   UserRole,
 } from "@/app/auth/actions";
 import { validatePassword } from "@/lib/password-rules";
+import { useBottomSheet } from "@/lib/useBottomSheet";
+import { cn } from "@/lib/utils";
 
 interface TeamManagementModalProps {
   isOpen: boolean;
@@ -62,6 +64,11 @@ export default function TeamManagementModal({
   const hasUppercase = /[A-Z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
   const isPasswordValid = hasMinLength && hasUppercase && hasNumber;
+
+  const { sheetStyle, dragHandleProps, backdropProps, isDragging } = useBottomSheet({
+    isOpen,
+    onClose,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -223,19 +230,37 @@ export default function TeamManagementModal({
       onClick={() => {
         if (!isResetting) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+      {...backdropProps}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer touch-none"
     >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden cursor-default"
+        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden cursor-default overscroll-contain"
         onClick={(e) => e.stopPropagation()}
+        style={sheetStyle}
       >
-        {/* iOS Grabber */}
-        <div className="flex sm:hidden justify-center pt-2.5 pb-1">
-          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+        {/* iOS Dragger / Grabber */}
+        <div
+          {...dragHandleProps}
+          className="flex sm:hidden justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing touch-none select-none -mb-1"
+          aria-label="Drag to dismiss"
+          role="button"
+          tabIndex={0}
+        >
+          <div
+            className={cn(
+              "h-1.5 rounded-full transition-all duration-150",
+              isDragging
+                ? "w-14 bg-slate-400 scale-105"
+                : "w-11 bg-slate-300 hover:bg-slate-400"
+            )}
+          />
         </div>
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div
+          {...dragHandleProps}
+          className="flex items-center justify-between px-6 py-4 border-b border-slate-100 select-none touch-none"
+        >
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
               <Users className="w-5 h-5" />
@@ -278,7 +303,7 @@ export default function TeamManagementModal({
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5 overscroll-contain">
           {errorMessage && (
             <div className="flex items-start gap-2.5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-rose-500" />

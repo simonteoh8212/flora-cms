@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { loginAction } from "@/app/auth/actions";
 import { toast } from "react-toastify";
+import { useBottomSheet } from "@/lib/useBottomSheet";
+import { cn } from "@/lib/utils";
 
 interface LoginFormProps {
   hasAdmin: boolean;
@@ -40,6 +42,11 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
   // Forgot Password Modal State
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [resetUsername, setResetUsername] = useState("");
+
+  const { sheetStyle, dragHandleProps, backdropProps, isDragging } = useBottomSheet({
+    isOpen: forgotModalOpen,
+    onClose: () => setForgotModalOpen(false),
+  });
 
   // Close forgot password modal on Escape key press
   useEffect(() => {
@@ -251,14 +258,37 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
       {forgotModalOpen && (
         <div
           onClick={() => setForgotModalOpen(false)}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+          {...backdropProps}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer touch-none"
         >
           <div
-            className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 cursor-default"
+            className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 space-y-4 cursor-default overscroll-contain"
             onClick={(e) => e.stopPropagation()}
+            style={sheetStyle}
           >
+            {/* iOS Dragger / Grabber */}
+            <div
+              {...dragHandleProps}
+              className="flex sm:hidden justify-center -mt-2 pb-2 cursor-grab active:cursor-grabbing touch-none select-none"
+              aria-label="Drag to dismiss"
+              role="button"
+              tabIndex={0}
+            >
+              <div
+                className={cn(
+                  "h-1.5 rounded-full transition-all duration-150",
+                  isDragging
+                    ? "w-14 bg-slate-400 scale-105"
+                    : "w-11 bg-slate-300 hover:bg-slate-400"
+                )}
+              />
+            </div>
+
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div
+              {...dragHandleProps}
+              className="flex items-center justify-between border-b border-slate-100 pb-3 select-none touch-none"
+            >
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                   <HelpCircle className="w-4 h-4" />
