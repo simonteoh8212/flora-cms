@@ -11,7 +11,7 @@ import {
 } from "@/lib/auth";
 import { validatePassword, generateTemporaryPassword } from "@/lib/password-rules";
 
-export type UserRole = "SUPER_ADMIN" | "MASTER_ADMIN" | "ADMIN" | string;
+export type UserRole = "SUPER_ADMIN" | "MASTER_ADMIN" | "Staff" | "ADMIN" | string;
 
 export type AuthActionResult<T = unknown> = {
   success: boolean;
@@ -88,7 +88,8 @@ export async function registerAction(
     const username = formData.get("username")?.toString().trim().toLowerCase();
     const password = formData.get("password")?.toString();
     const confirmPassword = formData.get("confirmPassword")?.toString();
-    const requestedRole = (formData.get("role")?.toString() || "ADMIN") as UserRole;
+    const rawRole = (formData.get("role")?.toString() || "Staff").trim();
+    const requestedRole = (rawRole === "ADMIN" || rawRole.toUpperCase() === "STAFF" ? "Staff" : rawRole) as UserRole;
 
     if (!username) {
       return { success: false, error: "Username is required." };
@@ -124,11 +125,16 @@ export async function registerAction(
 
     const totalUsers = await prisma.user.count();
 
-    let assignedRole: UserRole = "ADMIN";
+    let assignedRole: string = "Staff";
+    let assignedRoleId: string | null = null;
 
     if (totalUsers === 0) {
       // Very first user is always the SUPER_ADMIN (Developer)
       assignedRole = "SUPER_ADMIN";
+      const superAdminRole = await prisma.role.findFirst({
+        where: { name: "SUPER_ADMIN" },
+      });
+      assignedRoleId = superAdminRole?.id || null;
     } else {
       // Must be logged in as SUPER_ADMIN or MASTER_ADMIN
       const currentSession = await getSession();
@@ -140,13 +146,46 @@ export async function registerAction(
       }
 
       if (currentSession.role === "SUPER_ADMIN") {
-        // Super admin can create any role
-        assignedRole = ["SUPER_ADMIN", "MASTER_ADMIN", "ADMIN"].includes(requestedRole)
-          ? requestedRole
-          : "MASTER_ADMIN";
+        // Super admin can assign any role
+        const matchingRole = await prisma.role.findFirst({
+          where: {
+            OR: [
+              { id: requestedRole },
+              { name: { equals: requestedRole, mode: "insensitive" as const } },
+              { name: { equals: "Staff", mode: "insensitive" as const } },
+            ],
+          },
+        });
+
+        if (matchingRole) {
+          assignedRole = matchingRole.name;
+          assignedRoleId = matchingRole.id;
+        } else {
+          assignedRole = requestedRole;
+        }
       } else if (currentSession.role === "MASTER_ADMIN") {
-        // Master admin can only create staff (ADMIN)
-        assignedRole = "ADMIN";
+        // Master admin can assign Staff or any custom non-system role
+        const matchingRole = await prisma.role.findFirst({
+          where: {
+            OR: [
+              { id: requestedRole },
+              { name: { equals: requestedRole, mode: "insensitive" as const } },
+              { name: { equals: "Staff", mode: "insensitive" as const } },
+            ],
+            isSystem: false,
+          },
+        });
+
+        if (matchingRole) {
+          assignedRole = matchingRole.name;
+          assignedRoleId = matchingRole.id;
+        } else {
+          const defaultStaff = await prisma.role.findFirst({
+            where: { name: { equals: "Staff", mode: "insensitive" as const } },
+          });
+          assignedRole = defaultStaff ? defaultStaff.name : "Staff";
+          assignedRoleId = defaultStaff ? defaultStaff.id : null;
+        }
       } else {
         return {
           success: false,
@@ -170,6 +209,7 @@ export async function registerAction(
         username,
         password: hashedPassword,
         role: assignedRole,
+        roleId: assignedRoleId,
       },
     });
 
@@ -270,6 +310,26 @@ export async function ensureRootSuperAdminExists() {
           password: hashedPassword,
           role: "SUPER_ADMIN",
           roleId: superAdminRole.id,
+        },
+      });
+    }
+
+    // Auto-migrate any legacy "ADMIN" users or unlinked staff to the "Staff" role
+    if (staffRole) {
+      await prisma.user.updateMany({
+        where: {
+          OR: [
+            { role: "ADMIN" },
+            { role: "admin" },
+            { role: "STAFF" },
+            { role: "staff" },
+            { role: "Staff", roleId: null },
+          ],
+          username: { not: "superadmin" },
+        },
+        data: {
+          role: "Staff",
+          roleId: staffRole.id,
         },
       });
     }
@@ -595,7 +655,7 @@ export async function updateUserRoleAction(
       where: {
         OR: [
           { id: newRoleOrId },
-          { name: { equals: newRoleOrId, mode: "insensitive" } },
+          { name: { equals: newRoleOrId, mode: "insensitive" as const } },
         ],
       },
     });

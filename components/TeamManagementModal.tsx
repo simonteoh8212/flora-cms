@@ -193,11 +193,13 @@ export default function TeamManagementModal({
           avatarBg: "bg-emerald-100 text-emerald-800",
           Icon: Crown,
         };
+      case "Staff":
+      case "STAFF":
       case "ADMIN":
       default:
         return {
           label: "Florist Staff",
-          shortLabel: "Florist Staff",
+          shortLabel: "Staff",
           pillBg: "bg-slate-100 text-slate-700 border-slate-200/80",
           avatarBg: "bg-slate-100 text-slate-700",
           Icon: User,
@@ -448,8 +450,8 @@ export default function TeamManagementModal({
                   ? isSelf
                   : isSuperAdmin ||
                     (isMasterAdmin &&
-                      (member.role === "ADMIN" ||
-                        member.role === "Staff" ||
+                      (member.role !== "SUPER_ADMIN" &&
+                        member.role !== "MASTER_ADMIN" ||
                         isSelf));
 
                 const canDelete =
@@ -538,7 +540,7 @@ export default function TeamManagementModal({
                             <>
                               <option value="SUPER_ADMIN">🛡️ Developer (Super)</option>
                               <option value="MASTER_ADMIN">👑 Florist Owner (Master)</option>
-                              <option value="ADMIN">🌿 Florist Staff</option>
+                              <option value="Staff">🌿 Florist Staff</option>
                             </>
                           )}
                         </select>

@@ -36,7 +36,7 @@ export default function RegisterForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<UserRole>(
-    currentUserRole === "SUPER_ADMIN" ? "MASTER_ADMIN" : "ADMIN"
+    currentUserRole === "SUPER_ADMIN" ? "MASTER_ADMIN" : "Staff"
   );
   const [showPassword, setShowPassword] = useState(false);
 
@@ -194,9 +194,9 @@ export default function RegisterForm({
 
                 <button
                   type="button"
-                  onClick={() => setRole("ADMIN")}
+                  onClick={() => setRole("Staff")}
                   className={`p-2 rounded-2xl border text-center transition-all ${
-                    role === "ADMIN"
+                    role === "Staff" || role === "STAFF" || role === "ADMIN"
                       ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-xs"
                       : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                   }`}
@@ -204,7 +204,7 @@ export default function RegisterForm({
                   <User className="w-4 h-4 text-slate-600 mx-auto mb-1" />
                   <span className="block text-[11px] font-bold leading-tight">Florist Staff</span>
                   <span className="block text-[9px] text-slate-500 font-normal">
-                    Staff Admin
+                    Staff
                   </span>
                 </button>
 
@@ -223,6 +223,21 @@ export default function RegisterForm({
                     Super Admin
                   </span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Role Indicator for Florist Owner (Master Admin) */}
+          {!isFirstAdmin && currentUserRole === "MASTER_ADMIN" && (
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
+                  🌿
+                </div>
+                <div>
+                  <span className="block font-bold text-emerald-950 text-xs">Role: Florist Staff (Staff)</span>
+                  <span className="block text-[10px] text-emerald-700">Team member with catalog View, Add, and Edit permissions</span>
+                </div>
               </div>
             </div>
           )}

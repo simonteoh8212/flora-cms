@@ -18,8 +18,12 @@ export default async function RegisterPage() {
     redirect("/login");
   }
 
-  // Staff accounts (ADMIN) cannot create other users
-  if (hasAdmin && currentUser?.role === "ADMIN") {
+  // Staff accounts cannot create other users
+  if (
+    hasAdmin &&
+    currentUser?.role !== "SUPER_ADMIN" &&
+    currentUser?.role !== "MASTER_ADMIN"
+  ) {
     redirect("/admin");
   }
 
