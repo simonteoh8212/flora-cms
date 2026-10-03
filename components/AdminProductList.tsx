@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   Crown,
   Shield,
+  Loader2,
 } from "lucide-react";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
 import TeamManagementModal from "./TeamManagementModal";
@@ -78,6 +79,8 @@ export default function AdminProductList({
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [seedingLoading, setSeedingLoading] = useState(false);
+  const [navigatingRegister, setNavigatingRegister] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Available categories derived from products or default set
   const categories = [
@@ -231,25 +234,36 @@ export default function AdminProductList({
             {perms.canManageTeam && (
               <Link
                 href="/register"
-                className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                onClick={() => setNavigatingRegister(true)}
+                className="p-2 rounded-full text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors relative"
                 title={
                   currentUser?.role === "SUPER_ADMIN"
                     ? "Create Florist Owner or Staff"
                     : "Register Florist Staff"
                 }
               >
-                <UserPlus className="w-4 h-4" />
+                {navigatingRegister ? (
+                  <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
+                ) : (
+                  <UserPlus className="w-4 h-4" />
+                )}
               </Link>
             )}
 
             <button
               onClick={async () => {
+                setIsLoggingOut(true);
                 await logoutAction();
               }}
+              disabled={isLoggingOut}
               className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
               title="Log out"
             >
-              <LogOut className="w-4 h-4" />
+              {isLoggingOut ? (
+                <Loader2 className="w-4 h-4 text-rose-500 animate-spin" />
+              ) : (
+                <LogOut className="w-4 h-4" />
+              )}
             </button>
 
             {/* Top Bar New Item Button (Rendered only if role has canAdd permission) */}

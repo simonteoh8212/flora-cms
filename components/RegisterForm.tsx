@@ -41,6 +41,8 @@ export default function RegisterForm({
   const [showPassword, setShowPassword] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isNavigatingBack, setIsNavigatingBack] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -92,9 +94,11 @@ export default function RegisterForm({
       if (res.success) {
         if (res.isFirstAdmin) {
           // First Super Admin automatically logged in
+          setIsRedirecting(true);
           router.push("/admin");
           router.refresh();
         } else {
+          setIsSubmitting(false);
           setSuccessMessage(
             `Account for @${username} created with role "${
               role === "MASTER_ADMIN"
@@ -109,13 +113,13 @@ export default function RegisterForm({
           setConfirmPassword("");
         }
       } else {
+        setIsSubmitting(false);
         setErrorMessage(res.error || "Failed to create account.");
       }
     } catch (err: unknown) {
+      setIsSubmitting(false);
       const msg = err instanceof Error ? err.message : "An error occurred during registration.";
       setErrorMessage(msg);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -354,10 +358,15 @@ export default function RegisterForm({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting || !isFormValid}
+              disabled={isSubmitting || isRedirecting || !isFormValid}
               className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
             >
-              {isSubmitting ? (
+              {isRedirecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Entering Portal...</span>
+                </>
+              ) : isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Creating Account...</span>
@@ -380,10 +389,22 @@ export default function RegisterForm({
 
         <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
           <Link
-            href="/login"
-            className="text-emerald-700 font-semibold hover:underline"
+            href={isFirstAdmin ? "/login" : "/admin"}
+            onClick={() => setIsNavigatingBack(true)}
+            className="text-emerald-700 font-semibold hover:underline flex items-center gap-1.5"
           >
-            ← Back to Login
+            {isNavigatingBack ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+            ) : (
+              <ArrowLeft className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {isNavigatingBack
+                ? "Opening..."
+                : isFirstAdmin
+                ? "Back to Login"
+                : "Back to Dashboard"}
+            </span>
           </Link>
 
           <span className="text-[11px] text-slate-400 flex items-center gap-1">

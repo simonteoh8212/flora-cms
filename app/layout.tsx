@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+import TopProgressBar from "@/components/TopProgressBar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,6 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased min-h-screen bg-slate-50 selection:bg-emerald-500 selection:text-white">
+        <Suspense fallback={null}>
+          <TopProgressBar />
+        </Suspense>
         {children}
       </body>
     </html>

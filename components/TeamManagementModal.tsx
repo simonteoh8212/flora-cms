@@ -54,6 +54,7 @@ export default function TeamManagementModal({
   const [resetSuccessPassword, setResetSuccessPassword] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isNavigatingRegister, setIsNavigatingRegister] = useState(false);
 
   // Live password validation
   const hasMinLength = newPassword.length >= 8;
@@ -390,10 +391,21 @@ export default function TeamManagementModal({
                 {(isSuperAdmin || isMasterAdmin) && (
                   <Link
                     href="/register"
-                    className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                    onClick={() => setIsNavigatingRegister(true)}
+                    className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1.5"
                   >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    <span>{isSuperAdmin ? "Add Account" : "Add Staff"}</span>
+                    {isNavigatingRegister ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                    ) : (
+                      <UserPlus className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {isNavigatingRegister
+                        ? "Opening..."
+                        : isSuperAdmin
+                        ? "Add Account"
+                        : "Add Staff"}
+                    </span>
                   </Link>
                 )}
               </div>

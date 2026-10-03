@@ -32,6 +32,8 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [navigatingSetup, setNavigatingSetup] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Forgot Password Modal State
@@ -57,16 +59,17 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
       const res = await loginAction(formData);
 
       if (res.success) {
+        setIsRedirecting(true);
         router.push(from);
         router.refresh();
       } else {
+        setIsSubmitting(false);
         setErrorMessage(res.error || "Invalid username or password.");
       }
     } catch (err: unknown) {
+      setIsSubmitting(false);
       const msg = err instanceof Error ? err.message : "An error occurred during login.";
       setErrorMessage(msg);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -92,10 +95,20 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
               </p>
               <Link
                 href="/register"
+                onClick={() => setNavigatingSetup(true)}
                 className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-white px-3 py-1.5 rounded-full border border-emerald-300 hover:bg-emerald-100 transition-colors shadow-xs"
               >
-                <span>Create Super Admin</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                {navigatingSetup ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                    <span>Opening Setup...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Super Admin</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
               </Link>
             </div>
           </div>
@@ -181,10 +194,15 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRedirecting}
               className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
             >
-              {isSubmitting ? (
+              {isRedirecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Entering Portal...</span>
+                </>
+              ) : isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Verifying...</span>
