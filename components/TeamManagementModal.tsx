@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   User,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import {
   getTeamMembersAction,
   resetUserPasswordAction,
@@ -113,7 +114,9 @@ export default function TeamManagementModal({
 
     const check = validatePassword(newPassword);
     if (!check.isValid) {
-      setErrorMessage(check.error || "Password does not meet requirements.");
+      const err = check.error || "Password does not meet requirements.";
+      setErrorMessage(err);
+      toast.warning(err);
       return;
     }
 
@@ -123,8 +126,11 @@ export default function TeamManagementModal({
 
     if (res.success) {
       setResetSuccessPassword(newPassword);
+      toast.success(`Password for @${selectedMember.username} reset successfully!`);
     } else {
-      setErrorMessage(res.error || "Failed to reset password.");
+      const err = res.error || "Failed to reset password.";
+      setErrorMessage(err);
+      toast.error(err);
     }
   };
 
@@ -147,8 +153,9 @@ export default function TeamManagementModal({
     const res = await deleteTeamMemberAction(member.id);
     if (res.success) {
       setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      toast.success(`User @${member.username} removed.`);
     } else {
-      alert(res.error || "Failed to delete team member.");
+      toast.error(res.error || "Failed to delete team member.");
     }
   };
 
@@ -162,8 +169,9 @@ export default function TeamManagementModal({
       setMembers((prev) =>
         prev.map((m) => (m.id === member.id ? { ...m, role: newRole } : m))
       );
+      toast.success(`Updated @${member.username}'s role to ${newRole}!`);
     } else {
-      alert(res.error || "Failed to update role.");
+      toast.error(res.error || "Failed to update role.");
     }
   };
 
@@ -171,6 +179,7 @@ export default function TeamManagementModal({
     if (resetSuccessPassword) {
       navigator.clipboard.writeText(resetSuccessPassword);
       setCopied(true);
+      toast.info("Password copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
     }
   };

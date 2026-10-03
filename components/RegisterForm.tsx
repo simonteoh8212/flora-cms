@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { registerAction, UserRole } from "@/app/auth/actions";
 import { validatePassword } from "@/lib/password-rules";
+import { toast } from "react-toastify";
 
 interface RegisterFormProps {
   isFirstAdmin: boolean;
@@ -66,17 +67,23 @@ export default function RegisterForm({
 
     const check = validatePassword(password);
     if (!check.isValid) {
-      setErrorMessage(check.error || "Password requirements not met.");
+      const err = check.error || "Password requirements not met.";
+      setErrorMessage(err);
+      toast.warning(err);
       return;
     }
 
     if (!passwordsMatch) {
-      setErrorMessage("Passwords do not match.");
+      const err = "Passwords do not match.";
+      setErrorMessage(err);
+      toast.warning(err);
       return;
     }
 
     if (username.trim().length < 3) {
-      setErrorMessage("Username must be at least 3 characters.");
+      const err = "Username must be at least 3 characters.";
+      setErrorMessage(err);
+      toast.warning(err);
       return;
     }
 
@@ -93,33 +100,36 @@ export default function RegisterForm({
 
       if (res.success) {
         if (res.isFirstAdmin) {
-          // First Super Admin automatically logged in
+          toast.success("Super Admin account initialized! Redirecting to dashboard...");
           setIsRedirecting(true);
           router.push("/admin");
           router.refresh();
         } else {
           setIsSubmitting(false);
-          setSuccessMessage(
-            `Account for @${username} created with role "${
-              role === "MASTER_ADMIN"
-                ? "Florist Owner (Master Admin)"
-                : role === "SUPER_ADMIN"
-                ? "Developer (Super Admin)"
-                : "Florist Staff"
-            }".`
-          );
+          const roleLabel =
+            role === "MASTER_ADMIN"
+              ? "Florist Owner (Master Admin)"
+              : role === "SUPER_ADMIN"
+              ? "Developer (Super Admin)"
+              : "Florist Staff";
+          const successMsg = `Account for @${username} created with role "${roleLabel}".`;
+          setSuccessMessage(successMsg);
+          toast.success(successMsg);
           setUsername("");
           setPassword("");
           setConfirmPassword("");
         }
       } else {
         setIsSubmitting(false);
-        setErrorMessage(res.error || "Failed to create account.");
+        const err = res.error || "Failed to create account.";
+        setErrorMessage(err);
+        toast.error(err);
       }
     } catch (err: unknown) {
       setIsSubmitting(false);
       const msg = err instanceof Error ? err.message : "An error occurred during registration.";
       setErrorMessage(msg);
+      toast.error(msg);
     }
   };
 

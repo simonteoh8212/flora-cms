@@ -19,6 +19,7 @@ import {
   Users,
   Info,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import {
   getRolesAndPermissionsAction,
   createRoleAction,
@@ -131,6 +132,7 @@ export default function RoleManagementModal({
 
     if (!roleName.trim()) {
       setErrorMessage("Role name is required.");
+      toast.warning("Role name is required.");
       return;
     }
 
@@ -149,15 +151,16 @@ export default function RoleManagementModal({
         });
 
         if (res.success) {
+          toast.success(`Role "${roleName}" permissions updated!`);
           setSuccessMessage(`Role "${roleName}" permissions updated.`);
           await loadRoles();
           if (onRoleChanged) onRoleChanged();
-          setTimeout(() => {
-            setIsEditing(false);
-            setSuccessMessage(null);
-          }, 1000);
+          setIsEditing(false);
+          setSuccessMessage(null);
         } else {
-          setErrorMessage(res.error || "Failed to update role.");
+          const errorMsg = res.error || "Failed to update role.";
+          setErrorMessage(errorMsg);
+          toast.error(errorMsg);
         }
       } else {
         // Create new role
@@ -171,20 +174,22 @@ export default function RoleManagementModal({
         });
 
         if (res.success) {
+          toast.success(`Role "${roleName}" created successfully!`);
           setSuccessMessage(`Role "${roleName}" created successfully.`);
           await loadRoles();
           if (onRoleChanged) onRoleChanged();
-          setTimeout(() => {
-            setIsEditing(false);
-            setSuccessMessage(null);
-          }, 1000);
+          setIsEditing(false);
+          setSuccessMessage(null);
         } else {
-          setErrorMessage(res.error || "Failed to create role.");
+          const errorMsg = res.error || "Failed to create role.";
+          setErrorMessage(errorMsg);
+          toast.error(errorMsg);
         }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error saving role.";
       setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -201,10 +206,11 @@ export default function RoleManagementModal({
 
     const res = await deleteRoleAction(role.id);
     if (res.success) {
+      toast.success(`Role "${role.name}" deleted.`);
       setRoles((prev) => prev.filter((r) => r.id !== role.id));
       if (onRoleChanged) onRoleChanged();
     } else {
-      alert(res.error || "Failed to delete role.");
+      toast.error(res.error || "Failed to delete role.");
     }
   };
 

@@ -21,6 +21,7 @@ import {
   Shield,
   Loader2,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import ProductFormModal, { SerializedProduct } from "./ProductFormModal";
 import TeamManagementModal from "./TeamManagementModal";
 import RoleManagementModal from "./RoleManagementModal";
@@ -125,7 +126,14 @@ export default function AdminProductList({
     );
 
     const res = await toggleProductAvailability(product.id, newStatus);
-    if (!res.success) {
+    if (res.success) {
+      toast.info(
+        newStatus
+          ? `"${product.name}" marked as In Stock`
+          : `"${product.name}" marked as Out of Stock`,
+        { autoClose: 2000 }
+      );
+    } else {
       console.warn("Stock toggle notice:", res.error);
       // In demo mode without DB, keep the local toggle visual
       if (!product.id.startsWith("sample-")) {
@@ -134,7 +142,7 @@ export default function AdminProductList({
             p.id === product.id ? { ...p, isAvailable: !newStatus } : p
           )
         );
-        alert(res.error || "Failed to update stock status.");
+        toast.error(res.error || "Failed to update stock status.");
       }
     }
   };
@@ -151,8 +159,9 @@ export default function AdminProductList({
 
     if (res.success || id.startsWith("sample-")) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      toast.success(`Removed "${name}" from catalog.`);
     } else {
-      alert(res.error || "Failed to delete product.");
+      toast.error(res.error || "Failed to delete product.");
     }
   };
 
@@ -162,9 +171,10 @@ export default function AdminProductList({
     const res = await seedDemoProducts();
     setSeedingLoading(false);
     if (res.success) {
+      toast.success("Starter flower catalog seeded successfully!");
       window.location.reload();
     } else {
-      alert(res.error || "Could not seed catalog.");
+      toast.error(res.error || "Could not seed catalog.");
     }
   };
 

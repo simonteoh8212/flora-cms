@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, ChangeEvent, FormEvent } from "react";
 import Image from "next/image";
 import { X, Camera, Upload, Sparkles, AlertCircle, Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
 import { createProduct, updateProduct } from "@/app/admin/actions";
 
 export interface SerializedProduct {
@@ -125,16 +126,19 @@ export default function ProductFormModal({
 
     if (!name.trim()) {
       setErrorMessage("Please enter the product name.");
+      toast.warning("Please enter the product name.");
       return;
     }
 
     if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
       setErrorMessage("Please enter a valid price (e.g. 45.00).");
+      toast.warning("Please enter a valid price.");
       return;
     }
 
     if (!imageFile && !imageUrlDirect && !previewUrl) {
       setErrorMessage("Please upload a photo of the flower arrangement.");
+      toast.warning("Please upload or choose a flower photo.");
       return;
     }
 
@@ -162,14 +166,22 @@ export default function ProductFormModal({
       }
 
       if (res.success) {
+        toast.success(
+          isEditing
+            ? `Updated "${name.trim()}" successfully!`
+            : `Added "${name.trim()}" to catalog!`
+        );
         onSuccess();
         onClose();
       } else {
-        setErrorMessage(res.error || "Failed to save product.");
+        const errorMsg = res.error || "Failed to save product.";
+        setErrorMessage(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
       setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

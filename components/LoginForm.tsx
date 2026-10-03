@@ -18,6 +18,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { loginAction } from "@/app/auth/actions";
+import { toast } from "react-toastify";
 
 interface LoginFormProps {
   hasAdmin: boolean;
@@ -59,7 +60,9 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
     setErrorMessage(null);
 
     if (!username.trim() || !password) {
-      setErrorMessage("Please enter your username and password.");
+      const err = "Please enter your username and password.";
+      setErrorMessage(err);
+      toast.warning(err);
       return;
     }
 
@@ -73,17 +76,21 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
       const res = await loginAction(formData);
 
       if (res.success) {
+        toast.success("Welcome back! Signing in...");
         setIsRedirecting(true);
         router.push(from);
         router.refresh();
       } else {
         setIsSubmitting(false);
-        setErrorMessage(res.error || "Invalid username or password.");
+        const err = res.error || "Invalid username or password.";
+        setErrorMessage(err);
+        toast.error(err);
       }
     } catch (err: unknown) {
       setIsSubmitting(false);
       const msg = err instanceof Error ? err.message : "An error occurred during login.";
       setErrorMessage(msg);
+      toast.error(msg);
     }
   };
 
@@ -150,7 +157,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
                 type="text"
                 autoCapitalize="none"
                 autoCorrect="off"
-                placeholder="e.g. superadmin"
+                placeholder="e.g. user123"
                 value={username}
                 onChange={(e) => {
                   setUsername(e.target.value);
@@ -236,9 +243,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>Protected Florist CMS • Admin Access Only</span>
           </div>
-          <span className="text-[10px] text-slate-400">
-            Root Developer: <strong className="text-slate-600">superadmin</strong> / <strong className="text-slate-600">superadmin</strong>
-          </span>
+
         </div>
       </div>
 
