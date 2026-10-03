@@ -410,11 +410,11 @@ export default function ProductFormModal({
           <div className="grid grid-cols-2 gap-3 items-center">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Price (USD) *
+                Price (RM) *
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">
-                  $
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
+                  RM
                 </span>
                 <input
                   type="number"
@@ -425,7 +425,7 @@ export default function ProductFormModal({
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   required
-                  className="w-full pl-8 pr-3 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  className="w-full pl-11 pr-3 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                 />
               </div>
             </div>
