@@ -98,6 +98,13 @@ export async function registerAction(
       return { success: false, error: "Username must be at least 3 characters." };
     }
 
+    if (username === "superadmin") {
+      return {
+        success: false,
+        error: "The username 'superadmin' is reserved for the root system developer.",
+      };
+    }
+
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       return {
         success: false,
@@ -193,10 +200,90 @@ export async function logoutAction() {
 }
 
 /**
+ * Ensure default system roles and root superadmin account exist (Self-healing bootstrap)
+ */
+export async function ensureRootSuperAdminExists() {
+  try {
+    let superAdminRole = await prisma.role.findFirst({
+      where: { name: "SUPER_ADMIN" },
+    });
+
+    if (!superAdminRole) {
+      superAdminRole = await prisma.role.create({
+        data: {
+          name: "SUPER_ADMIN",
+          description: "Root developer role with full unrestricted access to system, roles, and settings.",
+          isSystem: true,
+          canView: true,
+          canAdd: true,
+          canEdit: true,
+          canDelete: true,
+        },
+      });
+    }
+
+    const masterAdminRole = await prisma.role.findFirst({
+      where: { name: "MASTER_ADMIN" },
+    });
+
+    if (!masterAdminRole) {
+      await prisma.role.create({
+        data: {
+          name: "MASTER_ADMIN",
+          description: "Florist shop owner role with full catalog management and staff user provisioning.",
+          isSystem: true,
+          canView: true,
+          canAdd: true,
+          canEdit: true,
+          canDelete: true,
+        },
+      });
+    }
+
+    const staffRole = await prisma.role.findFirst({
+      where: { name: "Staff" },
+    });
+
+    if (!staffRole) {
+      await prisma.role.create({
+        data: {
+          name: "Staff",
+          description: "Florist team member: can view, add, and edit bouquets, but cannot delete.",
+          isSystem: false,
+          canView: true,
+          canAdd: true,
+          canEdit: true,
+          canDelete: false,
+        },
+      });
+    }
+
+    const existingSuperAdmin = await prisma.user.findUnique({
+      where: { username: "superadmin" },
+    });
+
+    if (!existingSuperAdmin) {
+      const hashedPassword = await hashPassword("superadmin");
+      await prisma.user.create({
+        data: {
+          username: "superadmin",
+          password: hashedPassword,
+          role: "SUPER_ADMIN",
+          roleId: superAdminRole.id,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn("Bootstrap self-healing check notice:", err);
+  }
+}
+
+/**
  * Check if the system has an existing admin or is in initial bootstrap mode
  */
 export async function getSystemAuthStatus() {
   try {
+    await ensureRootSuperAdminExists();
     const count = await prisma.user.count();
     const session = await getSession();
     return {
@@ -331,6 +418,16 @@ export async function resetUserPasswordAction(
       return { success: false, error: "Target user not found." };
     }
 
+    // Ironclad protection: No one can edit or reset superadmin password, except superadmin themselves
+    if (targetUser.username === "superadmin") {
+      if (session.userId !== targetUser.id) {
+        return {
+          success: false,
+          error: "Permission denied: The root superadmin account cannot be modified by other users.",
+        };
+      }
+    }
+
     // Role-based privilege validation
     if (caller.role === "SUPER_ADMIN") {
       // Super Admin has full unrestricted access
@@ -409,6 +506,14 @@ export async function deleteTeamMemberAction(
       return { success: false, error: "User not found." };
     }
 
+    // Ironclad protection: The root superadmin account can NEVER be deleted
+    if (targetUser.username === "superadmin") {
+      return {
+        success: false,
+        error: "Permission denied: The root superadmin account is permanent and cannot be deleted.",
+      };
+    }
+
     if (caller.role === "SUPER_ADMIN") {
       // Super Admin can delete anyone except self
     } else if (caller.role === "MASTER_ADMIN") {
@@ -459,6 +564,14 @@ export async function updateUserRoleAction(
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) {
       return { success: false, error: "User not found." };
+    }
+
+    // Ironclad protection: The root superadmin account role is permanent and cannot be modified
+    if (targetUser.username === "superadmin") {
+      return {
+        success: false,
+        error: "Permission denied: The root superadmin account role is permanent and cannot be modified.",
+      };
     }
 
     // Master Admin cannot modify Super Admin or promote to Super Admin/Master Admin

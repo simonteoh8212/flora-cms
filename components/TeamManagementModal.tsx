@@ -400,24 +400,38 @@ export default function TeamManagementModal({
 
               {members.map((member) => {
                 const isSelf = member.id === currentUserId;
+                const isRootSuperAdmin = member.username === "superadmin";
                 const roleConfig = getRoleConfig(member.role);
                 const RoleIcon = roleConfig.Icon;
 
                 // Action permissions:
-                // Super Admin: Can reset ANY member (including self, Master Admin, or Staff)
-                // Master Admin: Can reset Staff (ADMIN) or self; NEVER Super Admin
-                const canReset =
-                  isSuperAdmin ||
-                  (isMasterAdmin && (member.role === "ADMIN" || isSelf));
+                // Root superadmin account is permanent:
+                // - Cannot be deleted by anyone
+                // - Role cannot be changed by anyone
+                // - Password cannot be reset by other users; only by superadmin themselves when logged in
+                const canReset = isRootSuperAdmin
+                  ? isSelf
+                  : isSuperAdmin ||
+                    (isMasterAdmin &&
+                      (member.role === "ADMIN" ||
+                        member.role === "Staff" ||
+                        isSelf));
 
-                // Super Admin: Can delete ANY other member
-                // Master Admin: Can delete ONLY Staff (ADMIN)
                 const canDelete =
                   !isSelf &&
-                  (isSuperAdmin || (isMasterAdmin && member.role === "ADMIN"));
+                  !isRootSuperAdmin &&
+                  (isSuperAdmin ||
+                    (isMasterAdmin &&
+                      member.role !== "SUPER_ADMIN" &&
+                      member.role !== "MASTER_ADMIN"));
 
-                // Super Admin can change other member roles
-                const canChangeRole = isSuperAdmin && !isSelf;
+                const canChangeRole =
+                  !isSelf &&
+                  !isRootSuperAdmin &&
+                  (isSuperAdmin ||
+                    (isMasterAdmin &&
+                      member.role !== "SUPER_ADMIN" &&
+                      member.role !== "MASTER_ADMIN"));
 
                 return (
                   <div
@@ -443,10 +457,18 @@ export default function TeamManagementModal({
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${roleConfig.pillBg}`}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                              isRootSuperAdmin
+                                ? "bg-purple-100 text-purple-900 border-purple-300 font-extrabold shadow-xs"
+                                : roleConfig.pillBg
+                            }`}
                           >
                             <RoleIcon className="w-3 h-3" />
-                            <span>{member.roleName || roleConfig.label}</span>
+                            <span>
+                              {isRootSuperAdmin
+                                ? "Root Developer (Protected)"
+                                : member.roleName || roleConfig.label}
+                            </span>
                           </span>
                         </div>
                       </div>

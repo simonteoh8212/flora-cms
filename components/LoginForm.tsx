@@ -123,7 +123,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
                 type="text"
                 autoCapitalize="none"
                 autoCorrect="off"
-                placeholder="Enter your username"
+                placeholder="e.g. superadmin"
                 value={username}
                 onChange={(e) => {
                   setUsername(e.target.value);
@@ -156,7 +156,7 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -199,9 +199,14 @@ export default function LoginForm({ hasAdmin }: LoginFormProps) {
           </div>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-medium">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Protected Florist CMS • Admin Access Only</span>
+        <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col items-center justify-center gap-1 text-[11px] text-slate-400 font-medium">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Protected Florist CMS • Admin Access Only</span>
+          </div>
+          <span className="text-[10px] text-slate-400">
+            Root Developer: <strong className="text-slate-600">superadmin</strong> / <strong className="text-slate-600">superadmin</strong>
+          </span>
         </div>
       </div>
 
