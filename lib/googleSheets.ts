@@ -63,6 +63,20 @@ export async function syncOrderToGoogleSheet(
       };
     }
 
+    const responseText = await response.text();
+    try {
+      const json = JSON.parse(responseText);
+      if (json && json.result === "error") {
+        console.error("Google Sheet webhook script error:", json.error);
+        return {
+          success: false,
+          error: json.error || "Google Apps Script encountered an execution error.",
+        };
+      }
+    } catch {
+      // If response is not JSON, but status was 200, treat as success
+    }
+
     return { success: true };
   } catch (error: unknown) {
     console.error("Error syncing to Google Sheet:", error);
