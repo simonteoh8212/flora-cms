@@ -141,8 +141,8 @@ export default function OrderManagementView() {
   // Google Sheet Webhook link or spreadsheet view link
   const openGoogleSheet = () => {
     const targetUrl =
-      process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL ||
-      "https://docs.google.com/spreadsheets/d/1gUdZpiAntWB9v_ztA5Uoqmb9Xrc8mRLuXA8VZc97MKc/edit";
+      process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL
+      if(targetUrl)
     window.open(targetUrl, "_blank");
   };
 
